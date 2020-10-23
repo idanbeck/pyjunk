@@ -52,13 +52,13 @@ def load_mnist(include_labels=False):
 
     return load_pickled_data(mnist_file_path, include_labels)
 
-def visualize_data(data, indexes=None, size=100):
+def visualize_data(data, indexes=None, size=100, nrow=10, nchannels=3):
     if(indexes == None):
         indexes = np.random.choice(len(data), replace=False, size=(size,))
 
-    images = data[indexes].astype('float32') / 3.0 * 255.0
+    images = data[indexes].astype('float32') / nchannels * 255.0
 
-    show_samples(images)
+    show_samples(images, nrow=nrow)
 
 def show_samples(samples, fname=None, nrow=10, strTitle='Samples'):
     samples = (torch.FloatTensor(samples) / 255.0).permute(0, 3, 1, 2)
