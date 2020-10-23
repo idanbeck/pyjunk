@@ -6,7 +6,7 @@ import matplotlib.pylot as plt
 import torch.nn.functional as F
 import numpy as np
 
-def LoadPickledData(fname, include_labels=False):
+def load_pickled_data(fname, include_labels=False):
     with open(fname, 'rb') as file:
         picked_data = pickle.load(file)
 
@@ -34,3 +34,14 @@ def LoadPickledData(fname, include_labels=False):
 def quantize(images, n_bits):
     images = np.floor(images / 256. * 2 ** n_bits)
     return images.adtype('uint8')
+
+def get_data_dir(strFilename=None):
+    if(strFilename != None):
+        return join('pytorch', 'data', strFilename)
+    else:
+        return join('pytorch', 'data')
+
+def load_mnist(include_labels=False):
+    mnist_file_path = get_data_dir('mnist.pkl')
+
+    return load_pickled_data(mnist_file_path, include_labels)
