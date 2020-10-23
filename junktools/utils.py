@@ -37,9 +37,9 @@ def quantize(images, n_bits):
 
 def get_data_dir(strFilename=None):
     if(strFilename != None):
-        return join('pytorch', 'data', strFilename)
+        return join('pyjunk', 'data', strFilename)
     else:
-        return join('pytorch', 'data')
+        return join('pyjunk', 'data')
 
 def load_mnist(include_labels=False):
     mnist_file_path = get_data_dir('mnist.pkl')
