@@ -37,7 +37,12 @@ def quantize(images, n_bits):
 
 def get_data_dir(strFilename=None):
     if(strFilename != None):
-        return join('pyjunk', 'data', strFilename)
+        if '.pkl' in strFilename:
+            return join('pyjunk', 'data', 'pickles', strFilename)
+        elif '.png' in strFilename or '.png' in strFilename:
+            return join('pyjunk', 'data', 'images', strFilename)
+        else:
+            return join('pyjunk', 'data', strFilename)
     else:
         return join('pyjunk', 'data')
 
