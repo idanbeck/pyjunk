@@ -5,6 +5,7 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
+from torchvision.utils import make_grid
 
 def load_pickled_data(fname, include_labels=False):
     with open(fname, 'rb') as file:
@@ -50,3 +51,29 @@ def load_mnist(include_labels=False):
     mnist_file_path = get_data_dir('mnist.pkl')
 
     return load_pickled_data(mnist_file_path, include_labels)
+
+def visualize_data(data, indexes=None, size=100):
+    if(indexes == None):
+        indexes = np.random.choice(len(data), replace=False, size=(size,))
+
+    images = data[indexes].astype('float32') / 3.0 * 255.0
+
+    show_samples(images)
+
+def show_samples(samples, fname=None, nrow=10, strTitle='Samples'):
+    samples = (torch.FloatTensor(samples) / 255.0).permute(0, 3, 1, 2)
+    grid_image = make_grid(samples, nrow=nrow)
+    plt.figure()
+    plt.title(strTitle)
+    plt.imshow(grid_image.permute(1, 2, 0))
+    plt.axis('off')
+
+    # optionally save
+    if fname is not None:
+        if not exists(dirname(fname)):
+            os.makedirs(dirname(fname))
+        plt.tight_layout()
+        plt.savefig(fname)
+
+    plt.show()
+
