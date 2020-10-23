@@ -2,7 +2,7 @@ import os
 from os.path import join, dirname, exists
 import pickle
 import torch
-import matplotlib.pylot as plt
+import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
 
