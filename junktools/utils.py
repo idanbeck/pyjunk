@@ -39,13 +39,13 @@ def quantize(images, n_bits):
 def get_data_dir(strFilename=None):
     if(strFilename != None):
         if '.pkl' in strFilename:
-            return join('pyjunk', 'data', 'pickles', strFilename)
+            return join('repos', 'pyjunk', 'data', 'pickles', strFilename)
         elif '.png' in strFilename or '.png' in strFilename:
-            return join('pyjunk', 'data', 'images', strFilename)
+            return join('repos', 'pyjunk', 'data', 'images', strFilename)
         else:
-            return join('pyjunk', 'data', strFilename)
+            return join('repos', 'pyjunk', 'data', strFilename)
     else:
-        return join('pyjunk', 'data')
+        return join('repos', 'pyjunk', 'data')
 
 def load_mnist(include_labels=False):
     mnist_file_path = get_data_dir('mnist.pkl')

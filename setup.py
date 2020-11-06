@@ -3,9 +3,18 @@
 from distutils.core import setup
 from setuptools import find_packages
 
+print("installing junktools")
+
 setup(
     name='junktools',
     version='0.0.1',
-    packages=find_packages(),
+    packages=find_packages('.'),
     license='MIT License',
+    requires = [
+        "matplotlib",
+        "numpy",
+        "scipy",
+        "torch",
+        "torchvision",
+    ]
 )
