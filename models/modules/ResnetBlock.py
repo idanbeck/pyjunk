@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+# ResnetBlock
+
 class ResnetBlock(nn.Module):
     def __init__(self, n_filters, *args, inner_kernel=3, **kwargs):
         super(ResnetBlock, self).__init__(*args, **kwargs)
@@ -22,5 +24,5 @@ class ResnetBlock(nn.Module):
         out = input
         for layer in self.net:
             out = layer(out)
-        return out
+        return out + input
 
