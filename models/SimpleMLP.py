@@ -24,8 +24,10 @@ class SimpleMLP(Model):
 
         for block in range(self.n_blocks):
             self.net.extend([
+                # Block should output the same dim as the output of the last block if not input block
+                # TODO: Generalize this more
                 MLPBlock(
-                    self.dim_input,
+                    self.dim_input if block == 0 else self.dim_output,
                     self.dim_output,
                     [self.dim_inner] * self.n_layers,
                     fResidual=self.fResidual
@@ -48,7 +50,9 @@ class SimpleMLP(Model):
             out = block(out)
 
         # Reshape back into image
-        out = out.reshape(H, W, C)
+        # TODO: Generalize this  (force 3 channel output right now)
+        #out = out.reshape(H, W, C)
+        out = out.reshape(H, W, 3)
 
         return out
 
@@ -58,4 +62,10 @@ class SimpleMLP(Model):
         out = self.forward(torchInput)
         l2_reconstruction_loss = nn.MSELoss()
         out = l2_reconstruction_loss(torchInput, out)
+        return out
+
+    def loss_with_target(self, torchSourceImageBuffer, torchTargetImageBuffer):
+        out = self.forward(torchSourceImageBuffer)
+        l2_reconstruction_loss = nn.MSELoss()
+        out = l2_reconstruction_loss(out, torchTargetImageBuffer)
         return out

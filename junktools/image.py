@@ -8,24 +8,25 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 
 class image():
-    def __init__(self, strFilename=None, torchBuffer=None):
+    def __init__(self, strFilename=None, strFilepath=None, torchBuffer=None):
 
         if(strFilename != None):
             strFilepath = utils.get_data_dir(strFilename)
+
+        if(strFilepath!= None):
             self.npImageBuffer = np.array(imageio.imread(strFilepath))
             width, height, channels = self.shape()
             self.npImageBuffer = resize(self.npImageBuffer, (width, height))
 
             # Drop the alpha channel if it exists
             if(channels > 3):
-                print("removing alpha channel")
+                #print("removing alpha channel")
                 self.npImageBuffer = self.npImageBuffer[:, :, 0:3]
 
         elif(torchBuffer != None):
             self.npImageBuffer = torchBuffer.detach().cpu().numpy()
         else:
             raise NotImplementedError
-
 
     def shape(self):
         return self.npImageBuffer.shape

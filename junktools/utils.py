@@ -36,6 +36,16 @@ def quantize(images, n_bits):
     images = np.floor(images / 256. * 2 ** n_bits)
     return images.adtype('uint8')
 
+def enum_frame_dir(strFrameID=None):
+    strPath = join('repos', 'pyjunk', 'data', 'frames')
+
+    if(strFrameID != None):
+        # Enumerate the frame folder if exists
+        strPath = join(strPath, strFrameID)
+
+    files = os.listdir(strPath)
+    return files, strPath
+
 def get_data_dir(strFilename=None):
     if(strFilename != None):
         if '.pkl' in strFilename:

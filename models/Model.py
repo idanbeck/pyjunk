@@ -17,6 +17,17 @@ class Model(nn.Module):
     def forward(self, torchInput):
         pass
 
+    def forward_with_frame(self, frameObject):
+        # Grab the torch tensor from the frame (this may be a particularly deep tensor)
+        npFrameBuffer = frameObject.GetNumpyBuffer()
+        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+
+        # Run the model
+        torchOutput = self.forward(torchImageBuffer)
+
+        # return an image
+        return image(torchBuffer=torchOutput)
+
     def forward_with_image(self, imageObject):
         # Convert to torch tensor
         npImageBuffer = imageObject.npImageBuffer
@@ -35,5 +46,17 @@ class Model(nn.Module):
 
         # loss
         torchLoss = self.loss(torchImageBuffer)
+
+        return torchLoss
+
+    def loss_with_frame_and_target(self, sourceFrame, targetFrame):
+        npSourceFrameBuffer = sourceFrame.GetNumpyBuffer()
+        torchSourceImageBuffer = torch.FloatTensor(npSourceFrameBuffer)
+
+        npTargetFrameBuffer = targetFrame.GetNumpyBuffer()
+        torchTargetImageBuffer = torch.FloatTensor(npTargetFrameBuffer)
+
+        # loss with target
+        torchLoss = self.loss_with_target(torchSourceImageBuffer, torchTargetImageBuffer)
 
         return torchLoss
