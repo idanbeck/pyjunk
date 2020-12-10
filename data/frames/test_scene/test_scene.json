@@ -1,0 +1,22 @@
+{
+  "name": "test_scene",
+  "start_frame": 1,
+  "end_frame": 1,
+  "channels": [
+    "albedo",
+    "ambient_occlusion",
+    "metal",
+    "normal",
+    "object_id",
+    "rgb",
+    "smooth",
+    "specular",
+    "uv"
+  ],
+  "extension": "png",
+  "shape": [
+    1920,
+    1080,
+    4
+  ]
+}

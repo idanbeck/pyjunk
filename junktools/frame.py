@@ -6,7 +6,7 @@ from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.image import image
 
 class frame():
-    def __init__(self, strFrameID=None, sourceFrame=None, sourceChannels=None, *args, **kwargs):
+    def __init__(self, strFrameID=None, strFramesetName=None, sourceFrame=None, sourceChannels=None, *args, **kwargs):
         super(frame, self).__init__(*args, **kwargs)
 
         self.channels = {}
@@ -14,6 +14,7 @@ class frame():
         # Load from from folder on disk
         if(strFrameID != None):
             self.strFrameID = strFrameID
+            self.strFramesetName = strFramesetName
             self.LoadFrame()
         elif(sourceFrame != None):
             if(type(sourceFrame) is not frame):
@@ -29,11 +30,14 @@ class frame():
         else:
             raise NotImplementedError
 
+    def frame_id(self):
+        return self.strFrameID
+
     def LoadFrame(self):
         # Enumerate files in the respective folder location
         # pyjunk/frames/
 
-        files, strPath = utils.enum_frame_dir(strFrameID=self.strFrameID)
+        files, strPath = utils.enum_frame_dir(strFramesetName=self.strFramesetName, strFrameID=self.strFrameID)
 
         for strFilename in files:
             strName = os.path.splitext(strFilename)[0]
@@ -41,6 +45,9 @@ class frame():
 
     def visualize(self, strTitle=None):
         for strName, channelImage in self.channels.items():
+            if(self.strFrameID != None):
+                strName = strName + ": " + self.strFrameID
+
             if (strTitle != None):
                 channelImage.visualize(strTitle=strTitle + ': ' + strName)
             else:

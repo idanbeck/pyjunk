@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
 from torchvision.utils import make_grid
+import json
 
 def load_pickled_data(fname, include_labels=False):
     with open(fname, 'rb') as file:
@@ -36,8 +37,10 @@ def quantize(images, n_bits):
     images = np.floor(images / 256. * 2 ** n_bits)
     return images.adtype('uint8')
 
-def enum_frame_dir(strFrameID=None):
+def enum_frame_dir(strFramesetName=None, strFrameID=None):
     strPath = join('repos', 'pyjunk', 'data', 'frames')
+    if(strFramesetName != None):
+        strPath = join(strPath, strFramesetName)
 
     if(strFrameID != None):
         # Enumerate the frame folder if exists
@@ -61,6 +64,15 @@ def load_mnist(include_labels=False):
     mnist_file_path = get_data_dir('mnist.pkl')
 
     return load_pickled_data(mnist_file_path, include_labels)
+
+def LoadFramesetJSON(strFramesetName):
+    strFramesetFilename = strFramesetName + '.json'
+    strPath = join('repos', 'pyjunk', 'data', 'frames', strFramesetName)
+
+    framesetJSONFile = open(join(strPath, strFramesetFilename))
+    jsonFrameset = json.load(framesetJSONFile)
+    framesetJSONFile.close()
+    return jsonFrameset
 
 def visualize_data(data, indexes=None, size=100, nrow=10, nchannels=3):
     if(indexes == None):
