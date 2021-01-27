@@ -40,11 +40,9 @@ class SimpleMLP(Model):
         self.net = nn.ModuleList([*self.net])
 
     def forward(self, torchInput):
-        batch_size = 1
-
         # Flatten for MLP
-        H, W, C = torchInput.shape
-        out = torchInput.reshape(batch_size, H*W*C)
+        batch_size, H, W, C = torchInput.shape
+        out = torchInput.reshape(batch_size, H * W * C)
 
         for block in self.net:
             out = block(out)
@@ -52,7 +50,7 @@ class SimpleMLP(Model):
         # Reshape back into image
         # TODO: Generalize this  (force 3 channel output right now)
         #out = out.reshape(H, W, C)
-        out = out.reshape(H, W, 3)
+        out = out.reshape(batch_size, H, W, 3)
 
         return out
 
@@ -60,12 +58,34 @@ class SimpleMLP(Model):
     def loss(self, torchInput):
         # Ultimately we just want to determine an L2 reconstruction loss
         out = self.forward(torchInput)
-        l2_reconstruction_loss = nn.MSELoss()
-        out = l2_reconstruction_loss(torchInput, out)
-        return out
+
+        #l2_reconstruction_loss = nn.MSELoss()
+        #loss = l2_reconstruction_loss(torchInput, out)
+
+        l1_reconstruction_loss = nn.L1Loss()
+        loss = l1_reconstruction_loss(torchInput, out)
+
+        l2_lambda = 0.01
+        l2_reg = torch.tensor(0.)
+        for param in self.parameters():
+            l2_reg += torch.norm(param)
+        loss += l2_lambda * l2_reg
+
+        return loss
 
     def loss_with_target(self, torchSourceImageBuffer, torchTargetImageBuffer):
         out = self.forward(torchSourceImageBuffer)
-        l2_reconstruction_loss = nn.MSELoss()
-        out = l2_reconstruction_loss(out, torchTargetImageBuffer)
-        return out
+
+        # l2_reconstruction_loss = nn.MSELoss()
+        # loss = l2_reconstruction_loss(out, torchTargetImageBuffer)
+
+        l1_reconstruction_loss = nn.L1Loss()
+        loss = l1_reconstruction_loss(torchTargetImageBuffer, out)
+
+        l2_lambda = 0.01
+        l2_reg = torch.tensor(0.)
+        for param in self.parameters():
+            l2_reg += torch.norm(param)
+        loss += l2_lambda * l2_reg
+
+        return loss
