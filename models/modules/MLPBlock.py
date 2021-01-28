@@ -12,6 +12,9 @@ class MLPBlock(nn.Module):
         self.dims_hidden = dims_hidden
         self.fResidual = fResidual
 
+        if(self.fResidual == True and dim_input != dim_output):
+            self.input_residual_transform = nn.Parameter(torch.Tensor(dim_input, dim_output), requires_grad=True)
+
         # Set up the network
         self.net = []
         self.ConstructNetwork()
@@ -37,7 +40,16 @@ class MLPBlock(nn.Module):
 
     def forward(self, input):
         out = input
+
         for layer in self.net:
             out = layer(out)
-        return out + input if self.fResidual else out
+
+        if(self.fResidual == True):
+            if(self.dim_input == self.dim_output):
+                return out + input
+            else:
+                # This is hand wave-y, but apply a learned transform to input
+                return out + torch.matmul(input, self.input_residual_transform)
+        else:
+            return out
 

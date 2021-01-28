@@ -3,8 +3,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import random
 
 import numpy as np
+
+from repos.pyjunk.junktools import utils
 
 class SimpleTorchSolver():
     def __init__(self, model, params, *args, **kwargs):
@@ -14,6 +17,7 @@ class SimpleTorchSolver():
         self.epochs = params['epochs']
         self.grad_clip = params.get('grad_clip')    # If None won't do anything below
         self.model = model
+        self.batch_size = params.get('batch_size')
 
         self.strOptimizer = params['strOptimizer']
         if(self.strOptimizer == 'Adam'):
@@ -58,6 +62,35 @@ class SimpleTorchSolver():
 
         return training_losses
 
+    def train_frameset(self, train_source_frameset, train_target_frameset):
+        self.model.train()
+        training_losses = []
+
+        idx = [*range(train_source_frameset.num_frames)]
+        random.shuffle(idx)
+        idx = idx[:self.batch_size]
+        print(idx)
+
+        sourceFrames = [train_source_frameset[i] for i in idx]
+        targetFrames = [train_target_frameset[i] for i in idx]
+
+        #print(len(sourceFrames))
+
+        for sourceFrame, targetFrame in zip(sourceFrames, targetFrames):
+            #loss = self.model.loss_with_frameset_and_target(train_source_frameset, train_target_frameset)
+            loss = self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+
+            if(self.grad_clip):
+                nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
+
+            self.optimizer.step()
+            training_losses.append(loss.item())
+
+        return training_losses
+
     def test_images(self, test_data_images):
         self.model.eval()
         loss = 0.0
@@ -80,6 +113,17 @@ class SimpleTorchSolver():
                 loss += self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
 
             loss /= len(test_data)
+
+        return loss.item()
+
+    def test_frameset(self, test_source_frameset, test_target_frameset):
+        self.model.eval()
+        loss = 0.0
+
+        with torch.no_grad():
+            loss += self.model.loss_with_frameset_and_target(test_source_frameset, test_target_frameset)
+
+        #loss /= len(test_data)
 
         return loss.item()
 
@@ -116,6 +160,32 @@ class SimpleTorchSolver():
 
         return training_losses, test_losses
 
+    # TODO: utilize tqdm here
+    def train_for_epochs_frameset(self,
+                                  train_source_frameset, train_target_frameset,
+                                  test_source_frameset, test_target_frameset,
+                                  fVerbose=False):
+        training_losses = []
+        test_losses = []
+
+        for epoch in range(self.epochs):
+            train_losses = self.train_frameset(
+                train_source_frameset=train_source_frameset,
+                train_target_frameset=train_target_frameset,
+            )
+            training_losses.extend(train_losses)
+
+            test_loss = self.test_frameset(
+                test_source_frameset=train_source_frameset,
+                test_target_frameset=train_target_frameset,
+            )
+            test_losses.append(test_loss)
+
+            if(fVerbose):
+                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+
+        return training_losses, test_losses
+
     def train_and_visualize_images(self, train_data_images, test_data_images, strTitle="Train, Test Loss Plot"):
         # Train and evaluate the model
         training_losses, test_losses = self.train_for_epochs_images(train_data_images, test_data_images)
@@ -125,6 +195,9 @@ class SimpleTorchSolver():
 
         # Visualize image
         self.visualize_image_input(test_data_images[0], strTitle=strTitle)
+
+        # Play a sound when done
+        return utils.beep()
 
     def train_and_visualize_frames(self, train_data, test_data, strTitle="Train and Test Loss Plot"):
         # Train and eval the model
@@ -136,6 +209,32 @@ class SimpleTorchSolver():
         # Visualize image
         self.visualize_frame_input(test_data[0][0], strTitle=strTitle)
 
+        # Play a sound when done
+        return utils.beep()
+
+    def train_and_visualize_frameset(self,
+                                     train_source_frameset, train_target_frameset,
+                                     test_source_frameset, test_target_frameset,
+                                     strTitle="Train and Test Loss Plot",
+                                     fVerbose=False):
+        # Train and evaluate the model
+        training_losses, test_losses = self.train_for_epochs_frameset(
+            train_source_frameset=train_source_frameset,
+            train_target_frameset=train_target_frameset,
+            test_source_frameset=test_source_frameset,
+            test_target_frameset=test_target_frameset,
+            fVerbose=fVerbose
+        )
+
+        # Visualize Plot
+        self.visualize_train_test_plot(training_losses, test_losses, strTitle=strTitle)
+
+        # Visualize Image #TODO: This could be more better
+        self.visualize_frameset(test_source_frameset, test_target_frameset, strTitle=strTitle)
+
+        # Play a sound when done
+        return utils.beep()
+
     def visualize_frame_input(self, frameObject, strTitle="frame input"):
         imagePassThru = self.model.forward_with_frame(frameObject)
         imagePassThru.visualize(strTitle=strTitle)
@@ -143,6 +242,12 @@ class SimpleTorchSolver():
     def visualize_image_input(self, imageObject, strTitle="frame input"):
         imagePassThru = self.model.forward_with_image(imageObject)
         imagePassThru.visualize(strTitle=strTitle)
+
+    def visualize_frameset(self, test_source_frameset, test_target_frameset, strTitle="frameset", idx=0):
+
+        imagePassThru = self.model.forward_with_frame(test_source_frameset[idx])
+        test_target_frameset[idx].visualize(strTitle=strTitle + "target")
+        imagePassThru.visualize(strTitle=strTitle + "pass thru")
 
     def visualize_train_test_plot(self, training_losses, test_losses, strTitle="Train and Test Loss Plot"):
         plt.figure()

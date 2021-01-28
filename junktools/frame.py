@@ -10,6 +10,8 @@ class frame():
         super(frame, self).__init__(*args, **kwargs)
 
         self.channels = {}
+        self.strFrameID = ""
+        self.strFramesetName = ""
 
         # Load from from folder on disk
         if(strFrameID != None):
@@ -19,6 +21,9 @@ class frame():
         elif(sourceFrame != None):
             if(type(sourceFrame) is not frame):
                 raise Exception("Source frame not valid frame object")
+
+            self.strFrameID = sourceFrame.strFrameID
+            self.strFramesetName = sourceFrame.strFramesetName
 
             # Cherry pick the intended channels
             if(sourceChannels != None):
@@ -32,6 +37,9 @@ class frame():
 
     def frame_id(self):
         return self.strFrameID
+
+    def __getitem__(self, key):
+        return self.channels[key]
 
     def LoadFrame(self):
         # Enumerate files in the respective folder location

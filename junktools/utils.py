@@ -8,6 +8,49 @@ import numpy as np
 from torchvision.utils import make_grid
 import json
 
+import IPython
+
+def beep(freq=440, msDuration=55.0, envelope=None):
+    if(envelope != None):
+        msAttack, msDecay, ratioSustain, msRelease = envelope
+
+    fSampling = 44100
+    npTime = np.linspace(start=0.0,
+                         stop=(msDuration/1000.0),
+                         num=int((msDuration/1000.0) * fSampling))
+
+    # Release
+    if(envelope != None):
+        npTime = np.append(
+            npTime,
+            np.linspace(
+                start=(msDuration/1000.0),
+                stop=(msDuration/1000.0) + (msRelease / 1000.0),
+                num=int((msRelease/1000.0) * fSampling))
+        )
+
+    npBeep = np.sin(npTime * freq * (2 * np.pi))
+
+    # Envelope
+    if(envelope != None):
+        npAttack = np.linspace(start=0.0,
+                               stop=1.0,
+                               num=int((msAttack/1000.0) * fSampling))
+        npDecay = np.linspace(start=1.0,
+                              stop=ratioSustain,
+                              num=int((msDecay / 1000.0) * fSampling))
+        msSustain = msDuration - msDecay - msAttack
+        npSustain = np.array([ratioSustain] * int((msSustain / 1000.0) * fSampling))
+        npRelease = np.linspace(start=ratioSustain,
+                                stop=0.0,
+                                num=int((msRelease / 1000.0) * fSampling))
+        npEnvelope = np.concatenate((npAttack, npDecay, npSustain, npRelease))
+
+        npBeep = npBeep * npEnvelope
+
+    return IPython.display.Audio(
+        npBeep, rate=fSampling, autoplay=True)
+
 def load_pickled_data(fname, include_labels=False):
     with open(fname, 'rb') as file:
         picked_data = pickle.load(file)
