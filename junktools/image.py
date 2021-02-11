@@ -6,102 +6,166 @@ from torchvision.utils import make_grid
 import torch
 import matplotlib.pyplot as plt
 from skimage.transform import resize
+from enum import Enum
+
+from repos.pyjunk.junktools.image_transform import image_transform_resize
+from repos.pyjunk.junktools.image_transform import image_transform_square
+from repos.pyjunk.junktools.image_transform import image_transform_whiten
 
 class image():
-    def __init__(self, strFilename=None, strFilepath=None, torchBuffer=None):
 
-        if(strFilename != None):
-            strFilepath = utils.get_data_dir(strFilename)
+        class states(Enum):
+            not_loaded = "not_loaded",
+            loading = "loading",
+            loaded = "loaded",
+            loaded_from_buffer = "loaded_from_buffer",
+            unloading = "unloading"
 
-        if(strFilepath!= None):
-            self.npImageBuffer = np.array(imageio.imread(strFilepath))
+        def __init__(self,
+                     strFilename=None,
+                     strFilepath=None,
+                     torchBuffer=None,
+                     fJITLoading=False,
+                     strFrameID=None,
+                     strFramesetName=None,
+                     strChannelName=None,
+                     fVerbose=False):
+
+            self.fJITLoading = fJITLoading
+            self.transforms = []
+            self.npImageBuffer = None
+            self.load_state = self.states.not_loaded
+            self.fVerbose = fVerbose
+
+            self.strFrameID = strFrameID
+            self.strFramesetName = strFramesetName
+            self.strChannelName = strChannelName
+
+            self.strFilepath = strFilepath
+            if(strFilename != None):
+                self.strFilepath = utils.get_data_dir(strFilename)
+
+            if(self.strFilepath != None):
+                if(self.fJITLoading == False):
+                    self.LoadImage()
+
+            elif(torchBuffer != None):
+                self.npImageBuffer = torchBuffer.detach().cpu().numpy()
+                self.load_state = self.states.loaded_from_buffer
+            else:
+                raise NotImplementedError
+
+        def LoadImage(self):
+
+            self.load_state = self.states.loading
+            if(self.fVerbose):
+                print("loading image state: %s channel: %s id: %s frameset: %s" % (self.load_state, self.strChannelName, self.strFrameID, self.strFramesetName))
+
+            if (self.strFilepath == None):
+                raise NotImplementedError
+
+            self.npImageBuffer = np.array(imageio.imread(self.strFilepath))
             width, height, channels = self.shape()
             self.npImageBuffer = resize(self.npImageBuffer, (width, height))
 
             # Drop the alpha channel if it exists
-            if(channels > 3):
-                #print("removing alpha channel")
+            if (channels > 3):
+                # print("removing alpha channel")
                 self.npImageBuffer = self.npImageBuffer[:, :, 0:3]
 
-        elif(torchBuffer != None):
-            self.npImageBuffer = torchBuffer.detach().cpu().numpy()
-        else:
-            raise NotImplementedError
+            # Apply image transformations
+            if(self.fJITLoading == True):
+                for transform in self.transforms:
+                    transform.process_transform(inImage=self)
 
-    def shape(self):
-        return self.npImageBuffer.shape
+            self.load_state = self.states.loaded
 
-    def width(self):
-        return self.npImageBuffer.shape[0]
+            if (self.fVerbose):
+                print("loaded image state: %s channel: %s id: %s frameset: %s" % (self.load_state, self.strChannelName, self.strFrameID, self.strFramesetName))
 
-    def height(self):
-        return self.npImageBuffer.shape[1]
+        # Unload image from memory
+        def UnloadImage(self):
+            if(isinstance(self.npImageBuffer, np.ndarray)):
+                self.load_state = self.states.unloading
+                del self.npImageBuffer
+                self.npImageBuffer = None
 
-    def channels(self):
-        return self.npImageBuffer.shape[2]
+            self.load_state = self.states.not_loaded
 
-    def visualize(self, strTitle=None):
-        #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(0, 3, 1, 2)
-        #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(2, 0, 1)
-        vals = (torch.FloatTensor(self.npImageBuffer)).permute(2, 0, 1)
-        grid_image = make_grid(vals, nrow=1)
-        plt.figure()
-        plt.title(strTitle)
-        plt.imshow(grid_image.permute(1, 2, 0))
-        plt.axis('off')
+            if (self.fVerbose):
+                print("unloaded image state: %s channel: %s id: %s frameset: %s" % (self.load_state, self.strChannelName, self.strFrameID, self.strFramesetName))
 
-    def resize(self, width, height):
-        self.npImageBuffer = resize(self.npImageBuffer, (width, height))
+        def GetNumpyBuffer(self):
+            if(self.load_state == self.states.not_loaded):
+                self.LoadImage()
 
-    def square(self, max_size=None):
-        width, height, channels = self.shape()
-        dim = min(width, height)
+            if(not isinstance(self.npImageBuffer, np.ndarray)):
+                raise BufferError
 
-        if(max_size != None):
-            dim = min(max_size, dim)
+            return self.npImageBuffer
 
-        return self.resize(dim, dim)
+        def shape(self):
+            return self.npImageBuffer.shape
 
-    # Normalizes per the mean and std-dev of the image
-    # Utilizes zero component analysis
-    def whiten(self, fZCA=False):
-        width, height, channels = self.shape()
+        def width(self):
+            return self.npImageBuffer.shape[0]
 
-        # First get into correct set up (w, h last dims)
-        X = self.npImageBuffer
-        X.transpose(0, 1, 2)
+        def height(self):
+            return self.npImageBuffer.shape[1]
 
-        # Put into a design matrix
-        X = X.reshape(1, width * height * channels)
-        #print(X.shape)
+        def channels(self):
+            return self.npImageBuffer.shape[2]
 
-        # Center and normalize
-        u = X.mean()
-        std_dev = X.std()
-        X = (X - u) / std_dev
+        def visualize(self, strTitle=None):
+            #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(0, 3, 1, 2)
+            #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(2, 0, 1)
 
-        # Save this for multi-image
-        # Global contrast norm (L2) ensures vector sums to 1
-        #X = X / np.sqrt((X ** 2).sum(axis=1))[:, None]
+            if (self.fVerbose):
+                print("visualizing image state: %s id: %s frameset: %s" % (self.load_state, self.strFrameID, self.strFramesetName))
 
-        # ZCA Whitening
-        if(fZCA):
-            # idea: average across channels, calc the ZCA matrix and then apply this to the original image
-            cov = X.T.dot(X)
-            U, S, V = np.linalg.svd(cov)
-            eps = 1e-2  # Prevent division by zero
+            npImageBuffer = self.GetNumpyBuffer()
+            if(not isinstance(self.npImageBuffer, np.ndarray)):
+                raise BufferError
 
-            # Apply ZCA Whitening matrix
-            X = U.dot(np.diag(1.0/np.sqrt(S + eps))).dot(U.T).dot(X.T).T
+            vals = (torch.FloatTensor(npImageBuffer)).permute(2, 0, 1)
+            grid_image = make_grid(vals, nrow=1)
+            plt.figure()
+            plt.title(strTitle)
+            plt.imshow(grid_image.permute(1, 2, 0))
+            plt.axis('off')
 
-        # Reshape back into correct image
-        X = X.reshape(width, height, channels)
+            if(self.fJITLoading == True):
+                self.UnloadImage()
 
-        # Rescale to [0, 1]
-        min, Max = X.min(), X.max()
-        X = (X - min) / (Max - min)
+        # Both resize and square are simply a resize transformation
+        def resize(self, width, height):
+            resize_transform = image_transform_resize(width=width, height=height, fVerbose=self.fVerbose)
 
-        self.npImageBuffer = X
+            # This will gate the actual implementation to either when JIT is disabled or
+            # when it is enabled and the image is currently being loaded
+            if(self.fJITLoading == False or self.load_state == self.states.loading):
+                resize_transform.process_transform(inImage=self)
+            else:
+                self.transforms.append(resize_transform)
 
-    def print(self, w=None, h=None, c=None):
-        print(self.npImageBuffer[w, h, c])
+        def square(self, max_size=None):
+            square_transform = image_transform_square(max_size=max_size, fVerbose=self.fVerbose)
+
+            if (self.fJITLoading == False or self.load_state == self.states.loading):
+                square_transform.process_transform(inImage=self)
+            else:
+                self.transforms.append(square_transform)
+
+        # Normalizes per the mean and std-dev of the image
+        # Utilizes zero component analysis
+        def whiten(self, fZCA=False):
+            whiten_transform = image_transform_whiten(fZCA=fZCA, fVerbose=self.fVerbose)
+
+            if (self.fJITLoading == False or self.load_state == self.states.loading):
+                whiten_transform.process_transform(inImage=self)
+            else:
+                self.transforms.append(whiten_transform)
+
+
+        def print(self, w=None, h=None, c=None):
+            print(self.npImageBuffer[w, h, c])

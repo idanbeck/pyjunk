@@ -5,6 +5,7 @@
   "channels": [
     "albedo",
     "ambientocclusion",
+    "depth",
     "metal",
     "normal",
     "objectid",

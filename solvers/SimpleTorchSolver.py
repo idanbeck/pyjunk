@@ -18,6 +18,7 @@ class SimpleTorchSolver():
         self.grad_clip = params.get('grad_clip')    # If None won't do anything below
         self.model = model
         self.batch_size = params.get('batch_size')
+        self.test_batch_size = params.get('test_batch_size')
 
         self.strOptimizer = params['strOptimizer']
         if(self.strOptimizer == 'Adam'):
@@ -69,7 +70,7 @@ class SimpleTorchSolver():
         idx = [*range(train_source_frameset.num_frames)]
         random.shuffle(idx)
         idx = idx[:self.batch_size]
-        print(idx)
+        print("training on frames %s in frameset %s" % (idx, train_source_frameset.strFramesetName))
 
         sourceFrames = [train_source_frameset[i] for i in idx]
         targetFrames = [train_target_frameset[i] for i in idx]
@@ -120,8 +121,21 @@ class SimpleTorchSolver():
         self.model.eval()
         loss = 0.0
 
+        idx = [*range(test_source_frameset.num_frames)]
+        random.shuffle(idx)
+        idx = idx[:self.test_batch_size]
+        print("testing on frames %s in frameset %s" % (idx, test_source_frameset.strFramesetName))
+
+        sourceFrames = [test_source_frameset[i] for i in idx]
+        targetFrames = [test_target_frameset[i] for i in idx]
+
         with torch.no_grad():
-            loss += self.model.loss_with_frameset_and_target(test_source_frameset, test_target_frameset)
+            #loss += self.model.loss_with_frameset_and_target(test_source_frameset, test_target_frameset)
+
+            for sourceFrame, targetFrame in zip(sourceFrames, targetFrames):
+                loss += self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
+
+            loss /= self.test_batch_size
 
         #loss /= len(test_data)
 

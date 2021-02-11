@@ -6,24 +6,35 @@ from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.image import image
 
 class frame():
-    def __init__(self, strFrameID=None, strFramesetName=None, sourceFrame=None, sourceChannels=None, *args, **kwargs):
+    def __init__(self,
+                 strFrameID=None,
+                 strFramesetName=None,
+                 sourceFrame=None,
+                 sourceChannels=None,
+                 fJITLoading=False,
+                 fVerbose=False,
+                 *args, **kwargs):
         super(frame, self).__init__(*args, **kwargs)
 
         self.channels = {}
         self.strFrameID = ""
         self.strFramesetName = ""
+        self.fJITLoading = fJITLoading
+        self.fVerbose = fVerbose
 
         # Load from from folder on disk
         if(strFrameID != None):
             self.strFrameID = strFrameID
             self.strFramesetName = strFramesetName
             self.LoadFrame()
+
         elif(sourceFrame != None):
             if(type(sourceFrame) is not frame):
                 raise Exception("Source frame not valid frame object")
 
             self.strFrameID = sourceFrame.strFrameID
             self.strFramesetName = sourceFrame.strFramesetName
+            self.fJITLoading = sourceFrame.fJITLoading
 
             # Cherry pick the intended channels
             if(sourceChannels != None):
@@ -45,11 +56,22 @@ class frame():
         # Enumerate files in the respective folder location
         # pyjunk/frames/
 
-        files, strPath = utils.enum_frame_dir(strFramesetName=self.strFramesetName, strFrameID=self.strFrameID)
+        files, strPath = utils.enum_frame_dir(
+            strFramesetName=self.strFramesetName,
+            strFrameID=self.strFrameID
+        )
 
+        # Load each channel
         for strFilename in files:
             strName = os.path.splitext(strFilename)[0]
-            self.channels[strName] = image(strFilepath=join(strPath, strFilename))
+            self.channels[strName] = image(
+                strFrameID = self.strFrameID,
+                strFramesetName = self.strFramesetName,
+                strChannelName=strName,
+                strFilepath = join(strPath, strFilename),
+                fJITLoading = self.fJITLoading,
+                fVerbose = self.fVerbose
+            )
 
     def visualize(self, strTitle=None):
         for strName, channelImage in self.channels.items():
@@ -62,11 +84,19 @@ class frame():
                 channelImage.visualize(strTitle=strName)
 
     def square(self, max_size=256):
+
+
         for strName, channelImage in self.channels.items():
+            if (self.fVerbose == True):
+                print("squaring frameset %s frame %s channel %s" % (self.strFramesetName, self.strFrameID, strName))
+
             channelImage.square(max_size=max_size)
 
     def whiten(self, fZCA=False):
         for strName, channelImage in self.channels.items():
+            if (self.fVerbose == True):
+                print("whitening frameset %s frame %s channel %s" % (self.strFramesetName, self.strFrameID, strName))
+
             channelImage.whiten(fZCA=fZCA)
 
     def shape(self, strName=None):
@@ -91,6 +121,14 @@ class frame():
 
             return (height, width, channels)
 
+            # Unload image from memory
+    def Unload(self):
+        if (self.fVerbose):
+            print("unloading frame %s" % self.load_state)
+
+        for strName, channelImage in self.channels.items():
+            channelImage.UnloadImage()
+
     def GetNumpyBuffer(self, channels=None):
 
         # Use selective channels
@@ -100,10 +138,14 @@ class frame():
 
             for strName in channels:
                 if(fFirst):
-                    npBuffer = self.channels[strName].npImageBuffer
+                    npBuffer = self.channels[strName].GetNumpyBuffer()
                     fFirst = False
+                    if (self.channels[strName].fJITLoading == True):
+                        self.channels[strName].UnloadImage()
                 else:
-                    npBuffer = np.concatenate((npBuffer, self.channels[strName].npImageBuffer), axis=2)
+                    npBuffer = np.concatenate((npBuffer, self.channels[strName].GetNumpyBuffer()), axis=2)
+                    if (self.channels[strName].fJITLoading == True):
+                        self.channels[strName].UnloadImage()
 
             return npBuffer
         else:
@@ -112,9 +154,13 @@ class frame():
 
             for strName, channelImage in self.channels.items():
                 if(fFirst):
-                    npBuffer = channelImage.npImageBuffer
+                    npBuffer = channelImage.GetNumpyBuffer()
                     fFirst = False
+                    if(channelImage.fJITLoading == True):
+                        channelImage.UnloadImage()
                 else:
-                    npBuffer = np.concatenate((npBuffer, channelImage.npImageBuffer), axis=2)
+                    npBuffer = np.concatenate((npBuffer, channelImage.GetNumpyBuffer()), axis=2)
+                    if (channelImage.fJITLoading == True):
+                        channelImage.UnloadImage()
 
             return npBuffer
