@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from enum import Enum
 
+import os
+from os.path import join, dirname, exists
+
 from repos.pyjunk.junktools.image_transform import image_transform_resize
 from repos.pyjunk.junktools.image_transform import image_transform_square
 from repos.pyjunk.junktools.image_transform import image_transform_whiten
@@ -54,6 +57,27 @@ class image():
                 self.load_state = self.states.loaded_from_buffer
             else:
                 raise NotImplementedError
+
+        def SaveImage(self, strFramePath, strExtension):
+            strFilename = self.strChannelName + '.' + strExtension
+            strFramePathName = join(strFramePath, strFilename)
+            #imageWriter = imageio.get_writer(strFramePathName)
+
+            # This should work in the context of a JIT mode as well
+            npBuffer = self.GetNumpyBuffer()
+
+            if(self.fVerbose):
+                print("saving %s" % strFramePathName)
+            #print(npBuffer.shape)
+            #print(npBuffer)
+
+            #imageWriter.append_data(npBuffer)
+
+            #imageio.imwrite(strFramePathName, npBuffer.astype(np.uint8))
+            imageio.imwrite(strFramePathName, (npBuffer * 255.0).astype(np.uint8))
+
+            #imageWriter.close()
+
 
         def LoadImage(self):
 

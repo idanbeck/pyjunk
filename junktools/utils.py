@@ -117,6 +117,19 @@ def LoadFramesetJSON(strFramesetName):
     framesetJSONFile.close()
     return jsonFrameset
 
+def SaveNewFramesetJSON(strFramesetName, jsonData):
+    strFramesetFilename = strFramesetName + '.json'
+    strPath = join('repos', 'pyjunk', 'data', 'frames', strFramesetName)
+
+    if not os.path.exists(strPath):
+        os.makedirs(strPath)
+
+    with open(join(strPath, strFramesetFilename), 'w') as framesetJSONFile:
+        json.dump(jsonData, framesetJSONFile, indent=4)
+        framesetJSONFile.close()
+
+    return join(strPath, strFramesetFilename), strPath
+
 def visualize_data(data, indexes=None, size=100, nrow=10, nchannels=3):
     if(indexes == None):
         indexes = np.random.choice(len(data), replace=False, size=(size,))

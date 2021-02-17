@@ -16,5 +16,6 @@ setup(
         "scipy",
         "torch",
         "torchvision",
+        "albumentations"
     ]
 )

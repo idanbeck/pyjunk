@@ -1,0 +1,10 @@
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!*/spheres
+!*/test_scene
+
+# ...even if they are in subdirectories
+!*/

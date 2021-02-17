@@ -52,6 +52,18 @@ class frame():
     def __getitem__(self, key):
         return self.channels[key]
 
+    def SaveFrame(self, strPath, strExtension):
+
+        strFramePath = join(strPath, self.strFrameID)
+
+        # Create a directory for the frame
+        if not os.path.exists(strFramePath):
+            os.makedirs(strFramePath)
+
+        for idx, strChannelName  in enumerate(self.channels):
+            self.channels[strChannelName].SaveImage(strFramePath, strExtension)
+
+
     def LoadFrame(self):
         # Enumerate files in the respective folder location
         # pyjunk/frames/
@@ -63,7 +75,16 @@ class frame():
 
         # Load each channel
         for strFilename in files:
-            strName = os.path.splitext(strFilename)[0]
+            strName, strExt = os.path.splitext(strFilename)
+            strName = strName.lower()
+            strExt = strExt.lower()
+
+            # TODO: not handling meta data style JSON files yet
+            if(strExt == ".json"):
+                continue
+
+            #print("loading %s%s" % (strName, strExt))
+
             self.channels[strName] = image(
                 strFrameID = self.strFrameID,
                 strFramesetName = self.strFramesetName,

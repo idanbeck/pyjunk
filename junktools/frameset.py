@@ -1,6 +1,7 @@
 import os
 from os.path import join, dirname, exists
 import numpy as np
+import json
 
 from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.frame import frame
@@ -53,6 +54,30 @@ class frameset():
 
     def __getitem__(self, key):
         return self.frames[key]
+
+    def save_to_new_frameset(self, strNewFramesetName, strExtension="png"):
+        # Create a new JSON description
+        jsonData = {}
+        jsonData['name'] = strNewFramesetName
+        jsonData['start_frame'] = self.start_frame
+        jsonData['end_frame'] = self.end_frame
+        jsonData['channels'] = self.channel_names
+        jsonData['extension'] = strExtension
+        jsonData['shape'] = [self.W, self.H, self.C]
+
+        # Save the JSON file to a new folder named as the respective new frameset
+        strJsonPathname, strPath = utils.SaveNewFramesetJSON(strNewFramesetName, jsonData)
+        print(strJsonPathname)
+
+        # Save the frames
+        print("Saving frames %d to %d" % (self.start_frame, self.end_frame))
+
+        for idx, frame in enumerate(self.frames):
+            frame.SaveFrame(strPath, strExtension)
+
+        # Play a sound when done
+        return utils.beep()
+
 
     def LoadFrames(self, strFramesetName):
         # Load frame set from disk, first find the respective json file

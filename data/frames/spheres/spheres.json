@@ -1,7 +1,7 @@
 {
   "name": "spheres",
   "start_frame": 2,
-  "end_frame": 584,
+  "end_frame": 644,
   "channels": [
     "albedo",
     "ambientocclusion",
@@ -13,6 +13,9 @@
     "smoothness",
     "specular",
     "uv"
+  ],
+  "meta": [
+    "camera"
   ],
   "extension": "png",
   "shape": [

@@ -83,7 +83,10 @@ class image_transform_whiten(image_transform):
         # Center and normalize
         u = X.mean()
         std_dev = X.std()
-        X = (X - u) / std_dev
+
+        # If image is entirely black we get NaNaNaNaNaNaBatMan
+        if(u > 1e-5 and std_dev > 1e-5):
+            X = (X - u) / std_dev
 
         # Save this for multi-image
         # Global contrast norm (L2) ensures vector sums to 1
@@ -103,8 +106,10 @@ class image_transform_whiten(image_transform):
         X = X.reshape(width, height, channels)
 
         # Rescale to [0, 1]
-        min, Max = X.min(), X.max()
-        X = (X - min) / (Max - min)
+        # If entirely black more nananananabatman
+        if (u > 1e-5 and std_dev > 1e-5):
+            min, Max = X.min(), X.max()
+            X = (X - min) / (Max - min)
 
         inImage.npImageBuffer = X
 
