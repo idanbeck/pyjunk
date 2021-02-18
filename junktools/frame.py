@@ -5,6 +5,8 @@ import numpy as np
 from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.image import image
 
+import json
+
 class frame():
     def __init__(self,
                  strFrameID=None,
@@ -17,6 +19,7 @@ class frame():
         super(frame, self).__init__(*args, **kwargs)
 
         self.channels = {}
+        self.meta = {}
         self.strFrameID = ""
         self.strFramesetName = ""
         self.fJITLoading = fJITLoading
@@ -60,8 +63,18 @@ class frame():
         if not os.path.exists(strFramePath):
             os.makedirs(strFramePath)
 
+        # channels
         for idx, strChannelName  in enumerate(self.channels):
             self.channels[strChannelName].SaveImage(strFramePath, strExtension)
+
+        # meta data
+        for idx, strMetaName in enumerate(self.meta):
+            strFilename = strMetaName + '.json'
+            strJsonFilePath = join(strFramePath, strFilename)
+
+            with open(strJsonFilePath, 'w') as frameMetaJSONFile:
+                json.dump(self.meta[strMetaName], frameMetaJSONFile, indent=4)
+                frameMetaJSONFile.close()
 
 
     def LoadFrame(self):
@@ -81,18 +94,20 @@ class frame():
 
             # TODO: not handling meta data style JSON files yet
             if(strExt == ".json"):
-                continue
+                frameJSONFile = open(join(strPath, strFilename))
+                self.meta[strName] = json.load(frameJSONFile)
+                frameJSONFile.close()
+            else:
+                #print("loading %s%s" % (strName, strExt))
 
-            #print("loading %s%s" % (strName, strExt))
-
-            self.channels[strName] = image(
-                strFrameID = self.strFrameID,
-                strFramesetName = self.strFramesetName,
-                strChannelName=strName,
-                strFilepath = join(strPath, strFilename),
-                fJITLoading = self.fJITLoading,
-                fVerbose = self.fVerbose
-            )
+                self.channels[strName] = image(
+                    strFrameID = self.strFrameID,
+                    strFramesetName = self.strFramesetName,
+                    strChannelName=strName,
+                    strFilepath = join(strPath, strFilename),
+                    fJITLoading = self.fJITLoading,
+                    fVerbose = self.fVerbose
+                )
 
     def visualize(self, strTitle=None):
         for strName, channelImage in self.channels.items():
