@@ -62,6 +62,18 @@ class Model(nn.Module):
         # return an image
         return image(torchBuffer=torchOutput)
 
+    def loss_with_frame(self, frameObject):
+        # Grab the torch tensor from the frame (this may be a particularly deep tensor)
+        npFrameBuffer = frameObject.GetNumpyBuffer()
+        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+
+        # Run the model
+        torchLoss = self.loss(torchImageBuffer)
+
+        # return an image
+        return torchLoss
+
     def loss_with_image(self, imageObject):
         # Convert to torch tensor
         npImageBuffer = imageObject.npImageBuffer

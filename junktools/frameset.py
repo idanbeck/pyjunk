@@ -2,6 +2,7 @@ import os
 from os.path import join, dirname, exists
 import numpy as np
 import json
+import random
 
 from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.frame import frame
@@ -15,6 +16,7 @@ class frameset():
                  sourceFrameset=None,
                  sourceChannels=None,
                  strNewFramesetName=None,
+                 sourceFrames=None,
                  fJITLoading=False,
                  fVerbose=False,
                  *args, **kwargs
@@ -36,7 +38,22 @@ class frameset():
             self.strFramesetName = strFramesetName
             self.LoadFrames(strFramesetName)
 
+        elif(sourceFrames != None):
+            # This takes a frameset and selects out of it a set of frames
+            self.num_frames = num_frames
+            self.strFramesetName = strNewFramesetName if strNewFramesetName is not None else sourceFrameset.strFramesetName
+            self.fJITLoading = sourceFrameset.fJITLoading
+            self.num_channels = sourceFrameset.num_channels
+            self.W = sourceFrameset.W
+            self.H = sourceFrameset.H
+            self.C = sourceFrameset.C
+
+            for sourceFrame in sourceFrames:
+                newFrame = frame(sourceFrame=sourceFrame)
+                self.frames.append(newFrame)
+
         elif(sourceFrameset != None):
+            # This takes a frameset and reduces it to channels
             self.num_frames = sourceFrameset.num_frames
             self.strFramesetName = strNewFramesetName if strNewFramesetName is not None else sourceFrameset.strFramesetName
             self.fJITLoading = sourceFrameset.fJITLoading
@@ -54,6 +71,47 @@ class frameset():
 
     def __getitem__(self, key):
         return self.frames[key]
+
+    # This will create two framesets from this one
+    # randomly sampling the frames and splitting per the ratio
+    def split_into_train_and_test(self, train_test_ratio=0.8):
+        if(train_test_ratio >= 0.8 and train_test_ratio <= 0.2):
+            print("ratio cannot be below 80% and must be above 20%")
+            raise ValueError
+
+        idx = [*range(self.num_frames)]
+        random.shuffle(idx)
+        idx_split = int(self.num_frames * train_test_ratio)
+        idx_train = idx[:idx_split]
+        idx_test = idx[idx_split:]
+        # print(len(idx_train))
+        # print(len(idx_test))
+
+        trainingFrames = [self.frames[i] for i in idx_train]
+        testFrames = [self.frames[i] for i in idx_test]
+
+        strTrainFramesetName = self.strFramesetName + "_train"
+        strTestFramesetName = self.strFramesetName + "_test"
+
+        train_frameset = frameset(
+            sourceFrames=trainingFrames,
+            sourceFrameset=self,
+            strNewFramesetName=strTrainFramesetName,
+            num_frames=len(idx_train),
+            fVerbose=self.fVerbose
+        )
+
+        test_frameset = frameset(
+            sourceFrames=testFrames,
+            sourceFrameset=self,
+            strNewFramesetName=strTestFramesetName,
+            num_frames=len(idx_test),
+            fVerbose=self.fVerbose
+        )
+
+        return train_frameset, test_frameset
+
+
 
     def save_to_new_frameset(self, strNewFramesetName, strExtension="png"):
         # Create a new JSON description

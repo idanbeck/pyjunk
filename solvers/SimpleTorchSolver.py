@@ -9,22 +9,11 @@ import numpy as np
 
 from repos.pyjunk.junktools import utils
 
-class SimpleTorchSolver():
-    def __init__(self, model, params, *args, **kwargs):
-        super(SimpleTorchSolver, self).__init__(*args, *kwargs)
-        self.params = params
-        self.lr = params['lr']
-        self.epochs = params['epochs']
-        self.grad_clip = params.get('grad_clip')    # If None won't do anything below
-        self.model = model
-        self.batch_size = params.get('batch_size')
-        self.test_batch_size = params.get('test_batch_size')
+from repos.pyjunk.solvers.TorchSolver import TorchSolver
 
-        self.strOptimizer = params['strOptimizer']
-        if(self.strOptimizer == 'Adam'):
-            self.optimizer = optim.Adam(model.parameters(), lr = self.lr)
-        else:
-            self.optimizer = optim.Adam(model.parameters(), lr = self.lr)
+class SimpleTorchSolver(TorchSolver):
+    def __init__(self, model, params, *args, **kwargs):
+        super(SimpleTorchSolver, self).__init__(model=model, params=params, *args, *kwargs)
 
     def train_images(self, train_data_images):
         self.model.train()

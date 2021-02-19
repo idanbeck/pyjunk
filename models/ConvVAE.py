@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from repos.pyjunk.models.Model import Model
+from repos.pyjunk.junktools.image import image
+
+import math
 
 # Convolutional VAE model
 
@@ -11,8 +14,12 @@ class ConvEncoder(nn.Module):
         super(ConvEncoder, self).__init__(*args, **kwargs)
         self.input_shape = input_shape
         self.latent_dim = latent_dim
+        self.latent_dim_sqrt = int(math.sqrt(latent_dim))
 
-        C, H, W = input_shape
+        # input shape is h, w, c
+        H, W, C = input_shape
+
+        print(C)
 
         # Construct the net
         self.net = [
@@ -25,7 +32,11 @@ class ConvEncoder(nn.Module):
             nn.Conv2d(128, 256, 3, 2, 1),  # 4 x 4
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(4 * 4 * 256, 2 * self.latent_dim),
+            nn.Linear(
+                self.latent_dim_sqrt * self.latent_dim_sqrt * 256,
+                # 4 * 4 * 256,
+                2 * self.latent_dim
+            ),
         ]
 
         self.net = nn.ModuleList([*self.net])
@@ -42,11 +53,16 @@ class ConvDecoder(nn.Module):
     def __init__(self, latent_dim, output_shape, *args, **kwargs):
         super(ConvDecoder, self).__init__(*args, **kwargs)
         self.latent_dim = latent_dim
+        self.latent_dim_sqrt = int(math.sqrt(latent_dim))
         self.output_shape = output_shape
 
-        C, H, W = output_shape
+        # output shape is h, w, c
+        H, W, C = output_shape
 
-        self.fc_layer = nn.Linear(self.latent_dim, 4 * 4 * 128)
+        self.fc_layer = nn.Linear(
+            self.latent_dim,
+            self.latent_dim_sqrt * self.latent_dim_sqrt * 128)
+        # 4 * 4 * 128)
 
         # construct the net
         self.net = [
@@ -79,14 +95,19 @@ class ConvDecoder(nn.Module):
 class ConvVAE(Model):
     def __init__(self, input_shape, latent_dim, *args, **kwargs):
         super(ConvVAE, self).__init__(*args, **kwargs)
+
+        # input shape is h, w, c
         self.input_shape = input_shape
         self.latent_dim = latent_dim
+        self.latent_dim_sqrt = int(math.sqrt(latent_dim))
 
         # Set up the encoder and decoder
         self.encoder = ConvEncoder(input_shape, self.latent_dim)
         self.decoder = ConvDecoder(self.latent_dim, input_shape)
 
     def loss(self, input):
+        input = input.permute(0, 3, 1, 2)
+
         # shift into [-1, 1]
         out = input
         out = (out * 2.0) - 1.0
@@ -97,7 +118,8 @@ class ConvVAE(Model):
         x_tilda = self.decoder.forward(z)
 
         # Reconstruction loss is just MSE
-        reconstruction_loss = F.mse_loss(x_tilda, input, reduction='none').view(self.input_shape[0], -1).sum(1).mean()
+        #reconstruction_loss = F.mse_loss(x_tilda, input, reduction='none').view(self.input_shape[0], -1).sum(1).mean()
+        reconstruction_loss = F.mse_loss(x_tilda, out, reduction='none').view(self.input_shape[0], -1).sum(1).mean()
 
         # KL loss q(z|x) vs. N(0, I) (from VAE paper)
         kl_loss = (-0.5) * (1.0 + (2.0 * log_std_dev_z) - (mu_z ** 2) - (torch.exp(log_std_dev_z) ** 2))
@@ -107,5 +129,33 @@ class ConvVAE(Model):
 
         return loss
 
-    #def sample(self, n_samples):
+    def sample(self, n_samples):
+        images = []
+
+        with torch.no_grad():
+            z = torch.randn(n_samples, self.latent_dim)
+            samples = torch.clamp(self.decoder.forward(z), -1.0, 1.0)
+
+        #samples = x.cpu().permute(0, 2, 3, 1).numpy() * 0.5 + 0.5
+
+        for x in samples:
+            x = x.squeeze().permute(1, 2, 0) * 0.5 + 0.5
+            newImage = image(torchBuffer=x)
+            images.append(newImage)
+
+        return images
+
+    def forward_with_frame(self, frameObject):
+        # Grab the torch tensor from the frame (this may be a particularly deep tensor)
+        npFrameBuffer = frameObject.GetNumpyBuffer()
+        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+
+        # Run the model
+        torchOutput = self.forward(torchImageBuffer)
+        torchOutput = torchOutput.squeeze()
+
+        # return an image
+        return image(torchBuffer=torchOutput)
+
 
