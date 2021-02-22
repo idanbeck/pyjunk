@@ -33,8 +33,7 @@ class ConvEncoder(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
             nn.Linear(
-                self.latent_dim_sqrt * self.latent_dim_sqrt * 256,
-                # 4 * 4 * 256,
+                4 * 4 * 256,
                 2 * self.latent_dim
             ),
         ]
@@ -61,8 +60,8 @@ class ConvDecoder(nn.Module):
 
         self.fc_layer = nn.Linear(
             self.latent_dim,
-            self.latent_dim_sqrt * self.latent_dim_sqrt * 128)
-        # 4 * 4 * 128)
+            4 * 4 * 128
+        )
 
         # construct the net
         self.net = [
