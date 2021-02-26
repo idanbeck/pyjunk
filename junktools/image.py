@@ -83,7 +83,7 @@ class image():
 
             self.load_state = self.states.loading
             if(self.fVerbose):
-                print("loading image state: %s channel: %s id: %s frameset: %s" % (self.load_state, self.strChannelName, self.strFrameID, self.strFramesetName))
+                print("loading image state: %s channel: %s id: %s frameset: %s path: %s" % (self.load_state, self.strChannelName, self.strFrameID, self.strFramesetName, self.strFilepath))
 
             if (self.strFilepath == None):
                 raise NotImplementedError

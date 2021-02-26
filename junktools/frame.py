@@ -42,6 +42,13 @@ class frame():
             # Cherry pick the intended channels
             if(sourceChannels != None):
                 for strChannel in sourceChannels:
+                    strChannel = strChannel.lower()
+
+                    if strChannel not in sourceFrame.channels.keys():
+                        print("%s channel not present" % strChannel)
+                        print(sourceFrame.channels.keys())
+                        raise KeyError
+
                     self.channels[strChannel] = sourceFrame.channels[strChannel]
             else:
                 self.channels = sourceFrame.channels
