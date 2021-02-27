@@ -3,7 +3,7 @@ import nn.torch
 
 # Conv LSTM Module
 
-class ConvLSTMCell(nn.Module):
+class Conv2dLSTMCell(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, *args, **kwargs):
         super(ConvLSTMCell, self).__init__(*args, **kwargs)
         self.in_channels = in_channels
