@@ -1,5 +1,5 @@
 import torch
-import torch.nn
+import torch.nn as nn
 import torch.nn.functional as F
 
 from repos.pyjunk.models.modules.ConvLSTM import Conv2dLSTMCell
@@ -15,7 +15,12 @@ class InferenceCore(nn.Module):
         self.upsample_view = nn.ConvTranspose2d(7, 7, kernel_size=16, stride=16, padding=0, bias=False)
         self.upsample_reconstruction = nn.ConvTranspose2d(256, 256, kernel_size=16, stride=16, padding=0, bias=False)
         self.downsample_u = nn.Conv2d(128, 128, kernel_size=4, stride=4, padding=0, bias=False)
-        self.core = Conv2dLSTMCell(3 + 7 + 256 + (2 * 128), kernel_size=5, stride=1, padding=2)
+        self.core = Conv2dLSTMCell(
+            in_channels = 3 + 7 + 256 + (2 * 128),
+            out_channels = 128,
+            kernel_size = 5,
+            stride = 1,
+            padding = 2)
 
     def forward(self,
                 input, in_view, representation,

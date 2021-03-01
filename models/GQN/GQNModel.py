@@ -34,11 +34,11 @@ class GQNModel(Model):
             self.generation_core = GenerationCore()
         else:
             self.inference_core = nn.ModuleList([
-                InferenceCore(id=l) for l in range(self.num_layers)
+                InferenceCore() for l in range(self.num_layers)
             ])
 
             self.generation_core = nn.ModuleList([
-                GenerationCore(id=l) for l in range(self.num_layers)
+                GenerationCore() for l in range(self.num_layers)
             ])
 
         self.eta_pi = nn.Conv2d(128, 2 * 3, kernel_size=5, stride=1, padding=2)
@@ -115,7 +115,7 @@ class GQNModel(Model):
 
         mu_gen = self.eta_generation(u)
         gen_distro = torch.distribution.Normal(mu_gen, gen_sigma)
-        kl_loss += torch.sum(gen_distro.log_prob(query_x), dim=[1, 2, 3])
+        elbo_loss += torch.sum(gen_distro.log_prob(query_x), dim=[1, 2, 3])
 
         return elbo_loss, kl_loss
 

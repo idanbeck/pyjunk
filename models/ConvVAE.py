@@ -33,7 +33,8 @@ class ConvEncoder(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
             nn.Linear(
-                4 * 4 * 256,
+                #4 * 4 * 256,
+                8 * 8 * 256,
                 2 * self.latent_dim
             ),
         ]
@@ -60,7 +61,8 @@ class ConvDecoder(nn.Module):
 
         self.fc_layer = nn.Linear(
             self.latent_dim,
-            4 * 4 * 128
+            #4 * 4 * 128
+            8 * 8 * 128
         )
 
         # construct the net
@@ -84,7 +86,8 @@ class ConvDecoder(nn.Module):
         out = self.fc_layer(out)
 
         # reshape to (4, 4, 128)
-        out = out.view(-1, 128, 4, 4)
+        #out = out.view(-1, 128, 4, 4)
+        out = out.view(-1, 128, 8, 8)
 
         for layer in self.net:
             out = layer(out)
