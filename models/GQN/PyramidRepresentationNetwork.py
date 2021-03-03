@@ -21,8 +21,14 @@ class PyramidRepresentationNetwork(nn.Module):
     def forward(self, input, in_view):
         # broadcast view
         in_view = in_view.view(-1, 7, 1, 1).repeat(1, 1, 64, 64)
+
+        # print(in_view.shape)
+        # print(input.shape)
+
         out = torch.cat((in_view, input), dim=1)
         representation = self.net.forward(out)
+
+        #print(representation.shape)
 
         return representation
 

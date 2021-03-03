@@ -1,11 +1,13 @@
 import os
 from os.path import join, dirname, exists
 import numpy as np
+import torch
 
 from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.image import image
 
 import json
+import math
 
 class frame():
     def __init__(self,
@@ -38,6 +40,7 @@ class frame():
             self.strFrameID = sourceFrame.strFrameID
             self.strFramesetName = sourceFrame.strFramesetName
             self.fJITLoading = sourceFrame.fJITLoading
+            self.meta = sourceFrame.meta
 
             # Cherry pick the intended channels
             if(sourceChannels != None):
@@ -61,6 +64,29 @@ class frame():
 
     def __getitem__(self, key):
         return self.channels[key]
+
+    def GetFrameMeta(self, strKey):
+        return self.meta[strKey]
+
+    def GetFrameCameraView(self):
+        frame_camera_meta = self.GetFrameMeta("camera")
+        frame_camera_position = frame_camera_meta['position']
+        frame_camera_look_at = frame_camera_meta['look_at']
+        x, y, z = frame_camera_position['x'], frame_camera_position['y'], frame_camera_position['z']
+        l_x, l_y, l_z = frame_camera_look_at['x'], frame_camera_look_at['y'], frame_camera_look_at['z']
+
+        # View direction is the look at minus the position
+        vx, vy, vz = l_x - x, l_y - y, l_z - z
+        pitch_rad = math.atan2(vy, vz)      # Pitch is about the x axis
+        yaw_rad = math.atan2(vz, vx)        # yaw is about the y axis
+
+        # Note: Might want to confirm these values
+        return torch.tensor(
+            [x, y, z,
+             math.cos(yaw_rad), math.sin(yaw_rad),
+             math.cos(pitch_rad), math.sin(pitch_rad)]
+        )
+
 
     def SaveFrame(self, strPath, strExtension):
 

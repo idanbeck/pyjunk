@@ -46,7 +46,11 @@ class GQNModel(Model):
         self.eta_inference = nn.Conv2d(128, 3 * 2, kernel_size=5, stride=1, padding=2)
 
     def loss(self, in_x, in_view, query_view, query_x, gen_sigma):
-        B, C, H, W = in_x.size()
+        in_x = in_x.permute(0, 3, 1, 2)
+        query_x = query_x.permute(0, 3, 1, 2)
+
+        B = 1
+        M, C, H, W = in_x.size()
 
         # Representation Network
         if(self.representation == "tower"):
@@ -55,9 +59,13 @@ class GQNModel(Model):
             r = in_x.new_zeros((B, 256, 1, 1))
 
         # Generate the representation of the scene
-        for k in range(C):
-            r_k = self.representation_network(in_x[:, k], in_view[:, k])
+        #for k in range(C):
+        for k in range(M):
+            r_k = self.representation_network(in_x[k].unsqueeze(0), in_view[k])
             r += r_k
+
+        print("representation shape: ")
+        print(r.shape)
 
         # Generator Initial State
         cell_state_gen = in_x.new_zeros((B, 128, 16, 16))
@@ -225,3 +233,58 @@ class GQNModel(Model):
         x_tilda = torch.clamp(mu, 0, 1)
 
         return x_tilda
+
+    def loss_with_frames(self, in_frames, query_frame):
+
+        # Pixel standard-deviation
+        sigma_i, sigma_f = 2.0, 0.7
+        sigma = sigma_i
+
+        # TODO: Seems like a utility function - or frameset thing
+        # Combine in_frames into one contextBuffer
+        torchContextImageBuffer = None
+        torchContextViewBuffer = None
+        for f in in_frames:
+            npFrameBuffer = f.GetNumpyBuffer()
+            torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            if(torchContextImageBuffer == None):
+                torchContextImageBuffer = torchImageBuffer.unsqueeze(0)
+            else:
+                torchContextImageBuffer = torch.cat((torchContextImageBuffer, torchImageBuffer.unsqueeze(0)), dim=0)
+
+            frame_view = f.GetFrameCameraView()
+            if(torchContextViewBuffer == None):
+                torchContextViewBuffer = frame_view.unsqueeze(0)
+            else:
+                torchContextViewBuffer = torch.cat((torchContextViewBuffer, frame_view.unsqueeze(0)), dim=0)
+
+
+        # print(torchContextImageBuffer.shape)
+        # print(torchContextViewBuffer)
+        print(torchContextViewBuffer.shape)
+
+        # TODO: Get Context View
+
+        # Retrieve Query Image Buffer
+        npFrameBuffer = query_frame.GetNumpyBuffer()
+        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        torchQueryImageBuffer = torchImageBuffer.unsqueeze(0)
+        torchQueryViewBuffer = query_frame.GetFrameCameraView().unsqueeze(0)
+
+        # print(torchQueryImageBuffer.shape)
+        # print(torchQueryViewBuffer)
+        print(torchQueryViewBuffer.shape)
+
+        # TODO: Get Query View
+
+        # Run the model
+        torchLoss = self.loss(
+            in_x = torchContextImageBuffer,
+            in_view = torchContextViewBuffer,
+            query_x = torchQueryImageBuffer,
+            query_view = torchQueryViewBuffer,
+            gen_sigma = sigma
+        )
+
+        # return an image
+        return torchLoss
