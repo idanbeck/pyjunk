@@ -32,16 +32,16 @@ class GQNTorchSolver(TorchSolver):
         in_frames = [train_frameset[i] for i in context_idx]
         query_frame = train_frameset[query_idx]
 
-        loss = self.model.loss_with_frames(in_frames, query_frame)
+        elbo_loss, kl_loss = self.model.loss_with_frames(in_frames, query_frame)
 
         self.optimizer.zero_grad()
-        loss.backward()
+        elbo_loss.backward()
 
         if(self.grad_clip):
             nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
 
         self.optimizer.step()
-        training_losses.append(loss.item())
+        training_losses.append(elbo_loss.item())
 
         return training_losses
 
@@ -49,24 +49,24 @@ class GQNTorchSolver(TorchSolver):
         self.model.eval()
         loss = 0.0
 
-        idx = [*range(test_frameset.num_frames)]
-        random.shuffle(idx)
-        idx = idx[:self.test_batch_size]
-        print("testing on frames %s in frameset %s" % (idx, test_frameset.strFramesetName))
+        context_idx = [*range(test_frameset.num_frames)]
+        random.shuffle(context_idx)
+        context_idx = context_idx[:self.batch_size]
+        query_idx = random.randint(0, test_frameset.num_frames - 1)
+        print("testing on frames %s in frameset %s with query frame: %s" % (
+        context_idx, test_frameset.strFramesetName, query_idx))
 
-        frames = [test_frameset[i] for i in idx]
+        in_frames = [test_frameset[i] for i in context_idx]
+        query_frame = test_frameset[query_idx]
+
+        # TODO: Unclear if this is the right way to test
+        # I think it would make more sense to infer a query view
+        # and return the resulting error
 
         with torch.no_grad():
-            #loss += self.model.loss_with_frameset_and_target(test_source_frameset, test_target_frameset)
+            elbo_loss, kl_loss = self.model.loss_with_frames(in_frames, query_frame)
 
-            for frame in frames:
-                loss += self.model.loss_with_frame(frame)
-
-            loss /= self.test_batch_size
-
-        #loss /= len(test_data)
-
-        return loss.item()
+        return elbo_loss.item()
 
     def train_for_epochs_frameset(self,
                                   train_frameset,
