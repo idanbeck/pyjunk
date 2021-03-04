@@ -21,12 +21,14 @@ class TorchSolver():
         self.model = model
         self.batch_size = params.get('batch_size')
         self.test_batch_size = params.get('test_batch_size')
+        self.betas = params.get('betas')
+        self.eps = params.get('eps')
 
         self.strOptimizer = params['strOptimizer']
         if(self.strOptimizer == 'Adam'):
-            self.optimizer = optim.Adam(model.parameters(), lr = self.lr)
+            self.optimizer = optim.Adam(model.parameters(), lr = self.lr, betas = self.betas, eps = self.eps)
         else:
-            self.optimizer = optim.Adam(model.parameters(), lr = self.lr)
+            self.optimizer = optim.Adam(model.parameters(), lr = self.lr, betas = self.betas, eps = self.eps)
 
 
 

@@ -51,6 +51,9 @@ class GQNModel(Model):
         in_x = in_x.permute(0, 3, 1, 2)
         query_x = query_x.permute(0, 3, 1, 2)
 
+        in_x = (in_x * 2.0) - 1.0
+        query_x = (query_x * 2.0) - 1.0
+
         B = 1
         M, C, H, W = in_x.size()
 
@@ -127,11 +130,18 @@ class GQNModel(Model):
         gen_distro = torch.distributions.Normal(mu_gen, gen_sigma)
         elbo_loss += torch.sum(gen_distro.log_prob(query_x), dim=[1, 2, 3])
 
+        # From paper (section 2 - Optimization)
+        elbo_loss = -elbo_loss
+
         return elbo_loss, kl_loss
 
 
-    def generate(self, in_x, in_view, query_view):
-        B, C, H, W = in_x.size()
+    def generate(self, in_x, in_view, query_view, gen_sigma=0):
+        in_x = in_x.permute(0, 3, 1, 2)
+        in_x = (in_x * 2.0) - 1.0
+
+        B = 1
+        M, C, H, W = in_x.size()
 
         # Scene Encoder
         if (self.representation == "tower"):
@@ -140,14 +150,15 @@ class GQNModel(Model):
             r = in_x.new_zeros((B, 256, 1, 1))
 
             # Generate the representation of the scene
-        for k in range(C):
-            r_k = self.representation_network(in_x[:, k], in_view[:, k])
+        for k in range(M):
+            #r_k = self.representation_network(in_x[:, k], in_view[:, k])
+            r_k = self.representation_network(in_x[k].unsqueeze(0), in_view[k])
             r += r_k
 
         # Initialize state
         cell_state_gen = in_x.new_zeros((B, 128, 16, 16))
         hidden_state_gen = in_x.new_zeros((B, 128, 16, 16))
-        u = in_x.new_zeroes((B, 128, 64, 64))
+        u = in_x.new_zeros((B, 128, 64, 64))
 
         for l in range(self.num_layers):
             # prior
@@ -171,13 +182,26 @@ class GQNModel(Model):
         # Sample Image
         mu = self.eta_generation(u)
 
-        # TODO: allow for some variability
-        x_tilda = torch.clamp(mu, 0, 1)
+        # Allow for some variability
+        # Not sure if this is actually useful or not
+        if(gen_sigma == 0):
+            x_tilda = torch.clamp(mu, 0, 1)
+        else:
+            x_tilda = torch.distributions.Normal(mu, gen_sigma)
 
-        return x_tilda
+        x_tilda = x_tilda.squeeze().permute(1, 2, 0) * 0.5 + 0.5
+        x_tilda_image = image(torchBuffer=x_tilda)
+
+        return x_tilda_image
 
     def reconstruct(self, in_x, in_view, query_view, query_x):
-        B, C, H, W = in_x.size()
+        #B, C, H, W = in_x.size()
+
+        in_x = in_x.permute(0, 3, 1, 2)
+        in_x = (in_x * 2.0) - 1.0
+
+        B = 1
+        M, C, H, W = in_x.size()
 
         # Scene Encoder
         if (self.representation == "tower"):
@@ -186,8 +210,9 @@ class GQNModel(Model):
             r = in_x.new_zeros((B, 256, 1, 1))
 
             # Generate the representation of the scene
-        for k in range(C):
-            r_k = self.representation_network(in_x[:, k], in_view[:, k])
+        for k in range(M):
+            #r_k = self.representation_network(in_x[:, k], in_view[:, k])
+            r_k = self.representation_network(in_x[k].unsqueeze(0), in_view[k])
             r += r_k
 
         # Initialize inference state
@@ -234,7 +259,52 @@ class GQNModel(Model):
         # TODO: allow for some variability
         x_tilda = torch.clamp(mu, 0, 1)
 
-        return x_tilda
+        # TODO: allow for some variability
+        x_tilda = torch.clamp(mu, 0, 1)
+
+        x_tilda = x_tilda.squeeze().permute(1, 2, 0) * 0.5 + 0.5
+        x_tilda_image = image(torchBuffer=x_tilda)
+
+        return x_tilda_image
+
+    def generate_with_frames(self, in_frames, query_frame):
+        # Pixel standard-deviation
+        sigma_i, sigma_f = 2.0, 0.7
+        sigma = sigma_i
+        sigma = 0.0
+
+        # TODO: Seems like a utility function - or frameset thing
+        # Combine in_frames into one contextBuffer
+        torchContextImageBuffer = None
+        torchContextViewBuffer = None
+        for f in in_frames:
+            npFrameBuffer = f.GetNumpyBuffer()
+            torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            if (torchContextImageBuffer == None):
+                torchContextImageBuffer = torchImageBuffer.unsqueeze(0)
+            else:
+                torchContextImageBuffer = torch.cat((torchContextImageBuffer, torchImageBuffer.unsqueeze(0)), dim=0)
+
+            frame_view = f.GetFrameCameraView()
+            if (torchContextViewBuffer == None):
+                torchContextViewBuffer = frame_view.unsqueeze(0)
+            else:
+                torchContextViewBuffer = torch.cat((torchContextViewBuffer, frame_view.unsqueeze(0)), dim=0)
+
+        # Retrieve Query frame view
+        torchQueryViewBuffer = query_frame.GetFrameCameraView().unsqueeze(0)
+
+        # Run the model to generate an image
+
+        gen_image = self.generate(
+            in_x=torchContextImageBuffer,
+            in_view=torchContextViewBuffer,
+            query_view=torchQueryViewBuffer,
+            gen_sigma=sigma
+        )
+
+        # return the image
+        return gen_image
 
     def loss_with_frames(self, in_frames, query_frame):
 
@@ -265,8 +335,6 @@ class GQNModel(Model):
         # print(torchContextViewBuffer)
         print(torchContextViewBuffer.shape)
 
-        # TODO: Get Context View
-
         # Retrieve Query Image Buffer
         npFrameBuffer = query_frame.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
@@ -276,8 +344,6 @@ class GQNModel(Model):
         # print(torchQueryImageBuffer.shape)
         # print(torchQueryViewBuffer)
         print(torchQueryViewBuffer.shape)
-
-        # TODO: Get Query View
 
         # Run the model
         torchLoss = self.loss(

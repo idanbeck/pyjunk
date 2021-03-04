@@ -18,6 +18,25 @@ class GQNTorchSolver(TorchSolver):
     def __init__(self, model, params, *args, **kwargs):
         super(GQNTorchSolver, self).__init__(model=model, params=params, *args, *kwargs)
 
+    def generate_from_frameset(self, gen_frameset):
+        self.model.eval()
+
+        context_idx = [*range(gen_frameset.num_frames)]
+        random.shuffle(context_idx)
+        context_idx = context_idx[:self.batch_size]
+        query_idx = random.randint(0, gen_frameset.num_frames - 1)
+        print("Generating from frames %s in frameset %s with query frame: %s" % (
+        context_idx, gen_frameset.strFramesetName, query_idx))
+
+        in_frames = [gen_frameset[i] for i in context_idx]
+        query_frame = gen_frameset[query_idx]
+
+        with torch.no_grad():
+            gen_image = self.model.generate_with_frames(in_frames, query_frame)
+
+        return gen_image
+
+
     def train_frameset(self, train_frameset):
         self.model.train()
 
