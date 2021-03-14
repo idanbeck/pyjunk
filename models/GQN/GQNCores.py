@@ -67,4 +67,4 @@ class GenerationCore(nn.Module):
         cell_state, hidden_state = self.core(lstm_input, (cell_state, hidden_state))
         u = self.upsample_hidden_state(hidden_state) + u
 
-        return (cell_state, hidden_state)
+        return (cell_state, hidden_state, u)

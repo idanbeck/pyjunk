@@ -161,6 +161,14 @@ class image():
             if(self.fJITLoading == True):
                 self.UnloadImage()
 
+        def clear_transforms(self):
+            if (self.fJITLoading == False or self.load_state == self.states.loading):
+                print("Can't clear transforms on non JIT image or image that is being loaded")
+                raise NotImplementedError
+            else:
+                self.transforms = []
+
+
         # Both resize and square are simply a resize transformation
         def resize(self, width, height):
             resize_transform = image_transform_resize(width=width, height=height, fVerbose=self.fVerbose)

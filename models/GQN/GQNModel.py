@@ -113,11 +113,11 @@ class GQNModel(Model):
 
             # Update Generator State
             if(self.fSharedCore):
-                cell_state_gen, hidden_state_gen = self.generation_core(
+                cell_state_gen, hidden_state_gen, u = self.generation_core(
                     query_view, r, cell_state_gen, hidden_state_gen, u, z
                 )
             else:
-                cell_state_gen, hidden_state_gen = self.generation_core[l](
+                cell_state_gen, hidden_state_gen, u = self.generation_core[l](
                     query_view, r, cell_state_gen, hidden_state_gen, u, z
                 )
 
@@ -128,7 +128,11 @@ class GQNModel(Model):
 
         mu_gen = self.eta_generation(u)
         gen_distro = torch.distributions.Normal(mu_gen, gen_sigma)
-        elbo_loss += torch.sum(gen_distro.log_prob(query_x), dim=[1, 2, 3])
+
+        ll_loss = gen_distro.log_prob(query_x)
+        print("ll_loss: %d" % torch.sum(ll_loss, dim=[1, 2, 3]).item())
+
+        elbo_loss += torch.sum(ll_loss, dim=[1, 2, 3])
 
         # From paper (section 2 - Optimization)
         elbo_loss = -elbo_loss
@@ -171,11 +175,11 @@ class GQNModel(Model):
 
             # Update state
             if(self.fSharedCore):
-                cell_state_gen, hidden_state_gen = self.generation_core(
+                cell_state_gen, hidden_state_gen, u = self.generation_core(
                     query_view, r, cell_state_gen, hidden_state_gen, u, z
                 )
             else:
-                cell_state_gen, hidden_state_gen = self.generation_core[l](
+                cell_state_gen, hidden_state_gen, u = self.generation_core[l](
                     query_view, r, cell_state_gen, hidden_state_gen, u, z
                 )
 
@@ -245,11 +249,11 @@ class GQNModel(Model):
 
             # Update state
             if (self.fSharedCore):
-                cell_state_gen, hidden_state_gen = self.generation_core(
+                cell_state_gen, hidden_state_gen, u = self.generation_core(
                     query_view, r, cell_state_gen, hidden_state_gen, u, z
                 )
             else:
-                cell_state_gen, hidden_state_gen = self.generation_core[l](
+                cell_state_gen, hidden_state_gen, u = self.generation_core[l](
                     query_view, r, cell_state_gen, hidden_state_gen, u, z
                 )
 
@@ -267,7 +271,8 @@ class GQNModel(Model):
 
         return x_tilda_image
 
-    def generate_with_frames(self, in_frames, query_frame):
+    #def generate_with_frames(self, in_frames, query_frame):
+    def generate_with_frames_view(self, in_frames, torchQueryViewBuffer):
         # Pixel standard-deviation
         sigma_i, sigma_f = 2.0, 0.7
         sigma = sigma_i
@@ -291,8 +296,8 @@ class GQNModel(Model):
             else:
                 torchContextViewBuffer = torch.cat((torchContextViewBuffer, frame_view.unsqueeze(0)), dim=0)
 
-        # Retrieve Query frame view
-        torchQueryViewBuffer = query_frame.GetFrameCameraView().unsqueeze(0)
+        # # Retrieve Query frame view
+        # torchQueryViewBuffer = query_frame.GetFrameCameraView().unsqueeze(0)
 
         # Run the model to generate an image
 
@@ -306,12 +311,14 @@ class GQNModel(Model):
         # return the image
         return gen_image
 
-    def loss_with_frames(self, in_frames, query_frame):
+    def generate_with_frames(self, in_frames, query_frame):
+        # Retrieve Query frame view
+        torchQueryViewBuffer = query_frame.GetFrameCameraView().unsqueeze(0)
+        print(torchQueryViewBuffer.dtype)
 
-        # Pixel standard-deviation
-        sigma_i, sigma_f = 2.0, 0.7
-        sigma = sigma_i
+        return self.generate_with_frames_view(in_frames, torchQueryViewBuffer)
 
+    def loss_with_frames(self, in_frames, query_frame, sigma):
         # TODO: Seems like a utility function - or frameset thing
         # Combine in_frames into one contextBuffer
         torchContextImageBuffer = None

@@ -32,6 +32,7 @@ class frameset():
         self.W = 0
         self.H = 0
         self.C = 0
+        self.framsetJSON = None
 
         if(strFramesetName != None):
             self.num_frames = num_frames
@@ -132,6 +133,7 @@ class frameset():
 
         for idx, frame in enumerate(self.frames):
             frame.SaveFrame(strPath, strExtension)
+            frame.Unload()
 
         # Play a sound when done
         return utils.beep()
@@ -151,6 +153,9 @@ class frameset():
         self.W, self.H, self.C = int(self.W), int(self.H), int(self.C)
         self.num_channels = len(framesetJSON['channels'])
         self.channel_names = framesetJSON['channels']
+
+        # For posterity
+        self.framsetJSON = framesetJSON
 
         # TODO: This needs to be generalized, handled in the image.py code
         # since we drop the alpha channel
@@ -178,6 +183,15 @@ class frameset():
         print("Frameset: %s, %d frames with %d channels JIT %s" %
               (self.strFramesetName, len(self.frames), self.num_channels, ("enabled" if self.fJITLoading else "disabled")))
         #print("Frameset: %s , %d frames" % (self.strFramesetName, num_frames))
+
+    def clear_transforms(self):
+        for frame in self.frames:
+            if (self.fVerbose):
+                print("clearing frame %s transform" % frame.frame_id())
+            frame.clear_transforms()
+
+            # This is a bit hacky
+            self.W, self.H, self.C = self.framsetJSON['shape']
 
     def square(self, max_size):
         for frame in self.frames:

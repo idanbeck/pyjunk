@@ -152,9 +152,14 @@ class frame():
             else:
                 channelImage.visualize(strTitle=strName)
 
+    def clear_transforms(self):
+        for strName, channelImage in self.channels.items():
+            if (self.fVerbose == True):
+                print("clearing frameset %s frame %s channel %s transform" % (self.strFramesetName, self.strFrameID, strName))
+
+            channelImage.clear_transforms()
+
     def square(self, max_size=256):
-
-
         for strName, channelImage in self.channels.items():
             if (self.fVerbose == True):
                 print("squaring frameset %s frame %s channel %s" % (self.strFramesetName, self.strFrameID, strName))
@@ -190,7 +195,7 @@ class frame():
 
             return (height, width, channels)
 
-            # Unload image from memory
+    # Unload image from memory
     def Unload(self):
         if (self.fVerbose):
             print("unloading frame %s" % self.load_state)
