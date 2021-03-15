@@ -75,9 +75,9 @@ class frameset():
 
     # This will create two framesets from this one
     # randomly sampling the frames and splitting per the ratio
-    def split_into_train_and_test(self, train_test_ratio=0.8):
-        if(train_test_ratio >= 0.8 and train_test_ratio <= 0.2):
-            print("ratio cannot be below 80% and must be above 20%")
+    def split_into_train_and_test(self, train_test_ratio=0.8, train_indices=None, test_indices=None):
+        if(train_test_ratio > 0.8 and train_test_ratio < 0.2):
+            print("ratio cannot be above 80% and must be above 20%")
             raise ValueError
 
         idx = [*range(self.num_frames)]
@@ -85,8 +85,13 @@ class frameset():
         idx_split = int(self.num_frames * train_test_ratio)
         idx_train = idx[:idx_split]
         idx_test = idx[idx_split:]
-        # print(len(idx_train))
-        # print(len(idx_test))
+
+        # May provide override
+        if(train_indices != None):
+            idx_train = train_indices
+
+        if(test_indices != None):
+            idx_test = test_indices
 
         trainingFrames = [self.frames[i] for i in idx_train]
         testFrames = [self.frames[i] for i in idx_test]
@@ -112,7 +117,13 @@ class frameset():
 
         return train_frameset, test_frameset
 
+    def get_frame_ids(self):
+        indices = []
 
+        for frame in self.frames:
+            indices.append(int(frame.frame_id()) - 1)
+
+        return indices
 
     def save_to_new_frameset(self, strNewFramesetName, strExtension="png"):
         # Create a new JSON description

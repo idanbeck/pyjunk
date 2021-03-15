@@ -7,6 +7,32 @@ from repos.pyjunk.junktools.image import image
 
 import math
 
+# class DownConv(nn.Module):
+#     def __init__(self, in_filters, out_filters, kernel_size=3, stride=1, padding=1, *args, **kwargs):
+#         super(DownConv, self).__init__(*args, **kwargs)
+#         self.in_filters = in_filters
+#         self.out_filters = out_filters
+#         self.kernel_size = kernel_size
+#         self.stride = stride
+#         self.padding = padding
+#
+#         self.net = [
+#             nn.Conv2d(self.in_filters, self.out_filters,
+#                       self.kernel_size, self.stride, self.padding),
+#             nn.ReLU(),
+#             nn.Conv2d(self.out_filters, self.out_filters,
+#                       self.kernel_size, self.stride, self.padding),
+#             nn.ReLU(),
+#             nn.AvgPool2d(2),
+#         ]
+#         self.net = nn.ModuleList(*[self.net])
+#
+#
+#     def forward(self, input):
+#
+#
+#         return out, skip
+
 # Convolutional U-Net model
 
 class ConvUNetEncoder(nn.Module):
@@ -25,26 +51,26 @@ class ConvUNetEncoder(nn.Module):
 
         print(C)
 
-        scale = 0
-
         # First module
+        print("enc first: %d - %d" % (C, self.num_filters))
         first_module = [
             nn.Conv2d(C, self.num_filters * 2, 3, 1, 1),
             nn.ReLU(),
-            nn.Conv2d(self.num_filters * 2, self.num_filters * (2 ** scale), 3, 1, 1),
+            nn.Conv2d(self.num_filters * 2, self.num_filters, 3, 1, 1),
             nn.ReLU(),
             nn.AvgPool2d(2),
         ]
         first_module = nn.ModuleList(*[first_module])
         self.modules.append(first_module)
 
-        for scale in range(1, scale - 2):
+        for k in range(1, self.scale - 1):
+            print("enc inner: %d - %d" % (self.num_filters * (2 ** (k - 1)), self.num_filters * (2 ** k)))
             next_module = [
-                nn.Conv2d(self.num_filters * (2 ** (scale - 1)),
-                          self.num_filters * (2 ** scale), 3, 1, 1),
+                nn.Conv2d(self.num_filters * (2 ** (k - 1)),
+                          self.num_filters * (2 ** k), 3, 1, 1),
                 nn.ReLU(),
-                nn.Conv2d(self.num_filters * (2 ** scale),
-                          self.num_filters * (2 ** scale), 3, 1, 1),
+                nn.Conv2d(self.num_filters * (2 ** k),
+                          self.num_filters * (2 ** k), 3, 1, 1),
                 nn.ReLU(),
                 nn.AvgPool2d(2),
             ]
@@ -52,6 +78,7 @@ class ConvUNetEncoder(nn.Module):
             self.modules.append(next_module)
 
         # Final module
+        print("enc final: %d - %d" % (self.num_filters * (2 ** (scale - 2)), self.num_filters * (2 ** (scale - 1))))
         last_module = [
             nn.Conv2d(self.num_filters * (2 ** (self.scale - 2)),
                       self.num_filters * (2 ** (self.scale - 1)), 3, 1, 1),
@@ -65,12 +92,19 @@ class ConvUNetEncoder(nn.Module):
         module_outputs = []
 
         for module in self.modules:
+            #print(out.shape)
+
             for layer in module:
+                # Grab the output right before it goes to the pooling layer
+                if(isinstance(layer, nn.AvgPool2d)):
+                    #print(out.shape)
+                    module_outputs.append(out)
                 out = layer(out)
 
             # Cache module outputs
-            module_outputs.append(out)
 
+
+        #print(out.shape)
         return out, module_outputs
 
 class ConvUNetDecoder(nn.Module):
@@ -82,28 +116,34 @@ class ConvUNetDecoder(nn.Module):
 
         # TODO: Generalize upsampling
 
+        self.modules = []
+
         # output shape is h, w, c
         H, W, C = output_shape
 
         scale = self.scale
 
         # First module
+        in_c = self.num_filters * (2 ** (self.scale - 1))
+        out_c = self.num_filters * (2 ** (self.scale - 2))
+        print("dec first: %d - %d" % (in_c, out_c))
         first_module = [
-            nn.Conv2d(self.num_filters * (2 ** (self.scale - 1)),
-                      self.num_filters * (2 ** (self.scale - 1)), 3, 1, 1),
+            nn.Conv2d(in_c, out_c, 3, 1, 1),
             nn.ReLU(),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         ]
         first_module = nn.ModuleList(*[first_module])
         self.modules.append(first_module)
 
-        for scale in reversed(range(1, scale - 1)):
+        for k in reversed(range(2, self.scale)):
+            in_c = self.num_filters * (2 ** k)
+            inner_c = self.num_filters * (2 ** (k - 1))
+            out_c = self.num_filters * (2 ** (k - 2))
+            print("dec inner: %d - %d - %d" % (in_c, inner_c, out_c))
             next_module = [
-                nn.Conv2d(self.num_filters * (2 ** scale),
-                          self.num_filters * (2 ** (scale - 1)), 3, 1, 1),
+                nn.Conv2d(in_c, inner_c, 3, 1, 1),
                 nn.ReLU(),
-                nn.Conv2d(self.num_filters * (2 ** (scale - 1)),
-                          self.num_filters * (2 ** (scale - 1)), 3, 1, 1),
+                nn.Conv2d(inner_c, out_c, 3, 1, 1),
                 nn.ReLU(),
                 nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             ]
@@ -111,10 +151,14 @@ class ConvUNetDecoder(nn.Module):
             self.modules.append(next_module)
 
         # Last module
+        in_c = self.num_filters * 2
+        inner_c = self.num_filters
+        out_c = C
+        print("dec final: %d - %d - %d" % (in_c, inner_c, out_c))
         last_module = [
-            nn.Conv2d(self.num_filters * 2, self.num_filters, 3, 1, 1),
+            nn.Conv2d(in_c, inner_c, 3, 1, 1),
             nn.ReLU(),
-            nn.Conv2d(self.num_filters, C, 3, 1, 1),
+            nn.Conv2d(inner_c, out_c, 3, 1, 1),
             nn.ReLU(),
         ]
         last_module = nn.ModuleList(*[last_module])
@@ -125,13 +169,21 @@ class ConvUNetDecoder(nn.Module):
 
         # Concatenate skip connections
         skip_id = len(skip_connections) - 1
+        fFirst = True
 
         for module in self.modules:
 
             # First layer skip connect is just the output so skip it
-            if(skip_id != len(skip_connections) - 1):
+            if(fFirst == False):
+                print("%d" % skip_id)
+                print(out.shape)
+                print(skip_connections[skip_id].shape)
                 out = torch.cat((skip_connections[skip_id], out), dim=1)
+                skip_id -= 1
+            else:
+                fFirst = False
 
+            print(out.shape)
             for layer in module:
                 out = layer(out)
 
@@ -149,7 +201,7 @@ class ConvUNet(Model):
         # Set up the encoder and decoder
         self.encoder = ConvUNetEncoder(
             input_shape=self.input_shape,
-            shape=self.shape,
+            scale=self.scale,
             num_filters=self.num_filters
         )
 
