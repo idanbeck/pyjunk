@@ -4,36 +4,9 @@ import torch.nn.functional as F
 
 from repos.pyjunk.models.Model import Model
 from repos.pyjunk.junktools.image import image
+from repos.pyjunk.models.modules.SSIMModule import SSIMModule
 
 import math
-
-# class DownConv(nn.Module):
-#     def __init__(self, in_filters, out_filters, kernel_size=3, stride=1, padding=1, *args, **kwargs):
-#         super(DownConv, self).__init__(*args, **kwargs)
-#         self.in_filters = in_filters
-#         self.out_filters = out_filters
-#         self.kernel_size = kernel_size
-#         self.stride = stride
-#         self.padding = padding
-#
-#         self.net = [
-#             nn.Conv2d(self.in_filters, self.out_filters,
-#                       self.kernel_size, self.stride, self.padding),
-#             nn.ReLU(),
-#             nn.Conv2d(self.out_filters, self.out_filters,
-#                       self.kernel_size, self.stride, self.padding),
-#             nn.ReLU(),
-#             nn.AvgPool2d(2),
-#         ]
-#         self.net = nn.ModuleList(*[self.net])
-#
-#
-#     def forward(self, input):
-#
-#
-#         return out, skip
-
-# Convolutional U-Net model
 
 class ConvUNetEncoder(nn.Module):
     def __init__(self, input_shape, scale=3, num_filters=32, *args, **kwargs):
@@ -175,15 +148,15 @@ class ConvUNetDecoder(nn.Module):
 
             # First layer skip connect is just the output so skip it
             if(fFirst == False):
-                print("%d" % skip_id)
-                print(out.shape)
-                print(skip_connections[skip_id].shape)
+                # print("%d" % skip_id)
+                # print(out.shape)
+                # print(skip_connections[skip_id].shape)
                 out = torch.cat((skip_connections[skip_id], out), dim=1)
                 skip_id -= 1
             else:
                 fFirst = False
 
-            print(out.shape)
+            #print(out.shape)
             for layer in module:
                 out = layer(out)
 
@@ -197,6 +170,10 @@ class ConvUNet(Model):
         self.input_shape = input_shape
         self.scale = scale
         self.num_filters = num_filters
+        self.ssim_loss = SSIMModule(
+            window_size=11,
+            sigma=1.5
+        )
 
         # Set up the encoder and decoder
         self.encoder = ConvUNetEncoder(
@@ -226,30 +203,26 @@ class ConvUNet(Model):
 
         return out
 
+    def loss(self, in_x, target_x):
+        in_x = in_x.permute(0, 3, 1, 2)
+        target_x = target_x.permute(0, 3, 1, 2)
 
-    # def loss(self, input):
-    #     input = input.permute(0, 3, 1, 2)
-    #
-    #     # shift into [-1, 1]
-    #     out = input
-    #     out = (out * 2.0) - 1.0
-    #
-    #     # run the net
-    #     mu_z, log_std_dev_z = self.encoder.forward(out)
-    #     z = torch.randn_like(mu_z) * log_std_dev_z.exp() + mu_z
-    #     x_tilda = self.decoder.forward(z)
-    #
-    #     # Reconstruction loss is just MSE
-    #     #reconstruction_loss = F.mse_loss(x_tilda, input, reduction='none').view(self.input_shape[0], -1).sum(1).mean()
-    #     reconstruction_loss = F.mse_loss(x_tilda, out, reduction='none').view(self.input_shape[0], -1).sum(1).mean()
-    #
-    #     # KL loss q(z|x) vs. N(0, I) (from VAE paper)
-    #     kl_loss = (-0.5) * (1.0 + (2.0 * log_std_dev_z) - (mu_z ** 2) - (torch.exp(log_std_dev_z) ** 2))
-    #     kl_loss = kl_loss.sum(1).mean()
-    #
-    #     loss = kl_loss + reconstruction_loss
-    #
-    #     return loss
+        # shift to [-1, 1]
+        out = in_x
+        out = (out * 2.0) - 1.0
+
+        # encode
+        #print(out.shape)
+        out, skip = self.encoder.forward(out)
+
+        # decode
+        #print(out.shape)
+        out = self.decoder(out, skip)
+
+        #print(out.shape)
+        loss = self.ssim_loss.forward(out, target_x)
+
+        return loss
 
     # def sample(self, n_samples):
     #     images = []
