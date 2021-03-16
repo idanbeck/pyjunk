@@ -58,6 +58,15 @@ class image():
             else:
                 raise NotImplementedError
 
+        def SaveToFile(self, strFilename):
+            # This should work in the context of a JIT mode as well
+            npBuffer = self.GetNumpyBuffer()
+
+            if (self.fVerbose):
+                print("saving %s" % strFilename)
+
+            imageio.imwrite(strFilename, (npBuffer * 255.0).astype(np.uint8))
+
         def SaveImage(self, strFramePath, strExtension):
             strFilename = self.strChannelName + '.' + strExtension
             strFramePathName = join(strFramePath, strFilename)

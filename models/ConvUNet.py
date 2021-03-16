@@ -196,7 +196,7 @@ class ConvUNetDecoder(nn.Module):
         return out
 
 class ConvUNet(Model):
-    def __init__(self, input_shape, output_shape, scale=3, num_filters=32, *args, **kwargs):
+    def __init__(self, input_shape, output_shape, scale=3, num_filters=32, channels=3, *args, **kwargs):
         super(ConvUNet, self).__init__(*args, **kwargs)
 
         # input shape is h, w, c
@@ -204,10 +204,14 @@ class ConvUNet(Model):
         self.output_shape = output_shape
         self.scale = scale
         self.num_filters = num_filters
+        self.channels = channels
+
+        H, W, C = input_shape
 
         self.ssim_loss = SSIMModule(
             window_size=11,
             sigma=1.5,
+            channels=self.channels,
             c1=1e-4,
             c2=9e-4,
             fSizeAverage=True
@@ -261,7 +265,7 @@ class ConvUNet(Model):
         #out = out * 0.5 + 0.5
 
         #print(out.shape)
-        loss = 1.0 - self.ssim_loss.forward(out, target_x)
+        loss = 0.5 * (1.0 - self.ssim_loss.forward(out, target_x))
 
         return loss
 

@@ -27,6 +27,11 @@ class TorchSolver():
 
         self.scheduler_params = params.get('scheduler')
 
+        # Check point settings
+        self.checkpoint_file_name = params.get('checkpoint_file_name', None)
+        self.checkpoint_epochs = params.get('checkpoint_epochs', 10)
+        self.save_test_file_name = params.get('save_test_file_name', None)
+
 
         self.strOptimizer = params['strOptimizer']
         if(self.strOptimizer == 'Adam'):

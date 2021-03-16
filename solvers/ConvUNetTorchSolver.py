@@ -66,7 +66,12 @@ class ConvUNetTorchSolver(TorchSolver):
 
         #loss /= len(test_data)
 
-        return loss.item()
+        testImg = None
+        if(self.save_test_file_name != None):
+            frameid = random.randint(0, len(frames) - 1)
+            testImg = self.model.forward_with_frame(frames[frameid])
+
+        return loss.item(), testImg
 
     def train_for_epochs_frameset(self,
                                   train_frameset, train_target_frameset,
@@ -81,11 +86,24 @@ class ConvUNetTorchSolver(TorchSolver):
             )
             training_losses.extend(train_losses)
 
-            test_loss = self.test_frameset(test_frameset, test_target_frameset)
+            test_loss, testImg = self.test_frameset(test_frameset, test_target_frameset)
             test_losses.append(test_loss)
 
             if(fVerbose):
                 print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+
+            if(self.checkpoint_file_name != None and epoch % self.checkpoint_epochs == 0 and epoch != 0):
+                print("Saving checkpoint to %s at epoch %s and loss %s" % (self.checkpoint_file_name, epoch, test_loss))
+
+                self.SaveCheckpoint(
+                    self.checkpoint_file_name,
+                    epoch=epoch,
+                    loss=test_loss
+                )
+
+            if(self.save_test_file_name != None and testImg != None):
+                testImg.SaveToFile(self.save_test_file_name)
+
 
         return training_losses, test_losses
 

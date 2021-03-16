@@ -109,6 +109,7 @@ class SupersamplingUNet(Model):
         return out
 
     def loss(self, in_x, target_x):
+        B, C, H, W = target_x.shape
         in_x = in_x.permute(0, 3, 1, 2)
         target_x = target_x.permute(0, 3, 1, 2)
 
@@ -130,7 +131,8 @@ class SupersamplingUNet(Model):
         # decode
         out = self.unet.decoder(out, skip)
 
-        loss = 1.0 - self.unet.ssim_loss.forward(out, target_x)
+        #loss = 1.0 - self.unet.ssim_loss.forward(out, target_x)
+        loss = (1.0 - self.unet.ssim_loss.forward(out, target_x)) + 0.25 * torch.norm(out - target_x, 1)*(1.0/(C * H * W))
 
         return loss
 

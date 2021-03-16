@@ -29,11 +29,11 @@ def CreateGaussianWindow(window_size, channels, sigma):
     return gaussian_kernel
 
 class SSIMModule(nn.Module):
-    def __init__(self, window_size=11, sigma=1.5, c1=1e-4, c2=3e-4, fSizeAverage=True, *args, **kwargs):
+    def __init__(self, window_size=11, sigma=1.5, c1=1e-4, c2=3e-4, fSizeAverage=True, channels=1, *args, **kwargs):
         super(SSIMModule, self).__init__(*args, **kwargs)
         self.window_size = window_size
         self.sigma = sigma
-        self.channels = 3
+        self.channels = channels
         self.c1 = c1
         self.c2 = c2
         self.fSizeAverage = fSizeAverage
