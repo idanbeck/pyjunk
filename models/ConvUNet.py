@@ -17,7 +17,7 @@ class ConvUNetEncoder(nn.Module):
 
         # TODO: Generalize pooling
 
-        self.modules = []
+        self.net = []
 
         # input shape is h, w, c
         H, W, C = input_shape
@@ -28,54 +28,67 @@ class ConvUNetEncoder(nn.Module):
         print("enc first: %d - %d" % (C, self.num_filters))
         first_module = [
             nn.Conv2d(C, self.num_filters * 2, 3, 1, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(self.num_filters * 2, self.num_filters, 3, 1, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.AvgPool2d(2),
         ]
-        first_module = nn.ModuleList(*[first_module])
-        self.modules.append(first_module)
+        # first_module = nn.ModuleList(*[first_module])
+        # self.modules.append(first_module)
+        self.net.extend(*[first_module])
 
         for k in range(1, self.scale - 1):
             print("enc inner: %d - %d" % (self.num_filters * (2 ** (k - 1)), self.num_filters * (2 ** k)))
             next_module = [
                 nn.Conv2d(self.num_filters * (2 ** (k - 1)),
                           self.num_filters * (2 ** k), 3, 1, 1),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.Conv2d(self.num_filters * (2 ** k),
                           self.num_filters * (2 ** k), 3, 1, 1),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.AvgPool2d(2),
             ]
-            next_module = nn.ModuleList(*[next_module])
-            self.modules.append(next_module)
+            # next_module = nn.ModuleList(*[next_module])
+            # self.modules.append(next_module)
+            self.net.extend(*[next_module])
 
         # Final module
         print("enc final: %d - %d" % (self.num_filters * (2 ** (scale - 2)), self.num_filters * (2 ** (scale - 1))))
         last_module = [
             nn.Conv2d(self.num_filters * (2 ** (self.scale - 2)),
                       self.num_filters * (2 ** (self.scale - 1)), 3, 1, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
         ]
-        last_module = nn.ModuleList(*[last_module])
-        self.modules.append(last_module)
+        # last_module = nn.ModuleList(*[last_module])
+        # self.modules.append(last_module)
+        self.net.extend(*[last_module])
+
+        #self.modules = nn.ModuleList(*[self.modules])
+        self.net = nn.ModuleList(*[self.net])
 
     def forward(self, input):
         out = input
         module_outputs = []
 
-        for module in self.modules:
+        # for module in self.modules.all():
+        #     #print(out.shape)
+        #
+        #     for layer in module:
+        #         # Grab the output right before it goes to the pooling layer
+        #         if(isinstance(layer, nn.AvgPool2d)):
+        #             #print(out.shape)
+        #             module_outputs.append(out)
+        #         out = layer(out)
+        #
+        #     # Cache module outputs
+
+        for layer in self.net:
             #print(out.shape)
-
-            for layer in module:
-                # Grab the output right before it goes to the pooling layer
-                if(isinstance(layer, nn.AvgPool2d)):
-                    #print(out.shape)
-                    module_outputs.append(out)
-                out = layer(out)
-
-            # Cache module outputs
-
+            # Grab the output right before it goes to the pooling layer
+            if(isinstance(layer, nn.AvgPool2d)):
+                #print(out.shape)
+                module_outputs.append(out)
+            out = layer(out)
 
         #print(out.shape)
         return out, module_outputs
@@ -89,7 +102,7 @@ class ConvUNetDecoder(nn.Module):
 
         # TODO: Generalize upsampling
 
-        self.modules = []
+        self.net = []
 
         # output shape is h, w, c
         H, W, C = output_shape
@@ -102,11 +115,12 @@ class ConvUNetDecoder(nn.Module):
         print("dec first: %d - %d" % (in_c, out_c))
         first_module = [
             nn.Conv2d(in_c, out_c, 3, 1, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         ]
-        first_module = nn.ModuleList(*[first_module])
-        self.modules.append(first_module)
+        # first_module = nn.ModuleList(*[first_module])
+        # self.modules.append(first_module)
+        self.net.extend(*[first_module])
 
         for k in reversed(range(2, self.scale)):
             in_c = self.num_filters * (2 ** k)
@@ -115,13 +129,14 @@ class ConvUNetDecoder(nn.Module):
             print("dec inner: %d - %d - %d" % (in_c, inner_c, out_c))
             next_module = [
                 nn.Conv2d(in_c, inner_c, 3, 1, 1),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.Conv2d(inner_c, out_c, 3, 1, 1),
-                nn.ReLU(),
+                nn.LeakyReLU(),
                 nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             ]
-            next_module = nn.ModuleList(*[next_module])
-            self.modules.append(next_module)
+            # next_module = nn.ModuleList(*[next_module])
+            # self.modules.append(next_module)
+            self.net.extend(*[next_module])
 
         # Last module
         in_c = self.num_filters * 2
@@ -130,49 +145,72 @@ class ConvUNetDecoder(nn.Module):
         print("dec final: %d - %d - %d" % (in_c, inner_c, out_c))
         last_module = [
             nn.Conv2d(in_c, inner_c, 3, 1, 1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(inner_c, out_c, 3, 1, 1),
-            nn.ReLU(),
+            #nn.ReLU(),
+            nn.Tanh()
+            #nn.Sigmoid()
         ]
-        last_module = nn.ModuleList(*[last_module])
-        self.modules.append(last_module)
+        # last_module = nn.ModuleList(*[last_module])
+        # self.modules.append(last_module)
+        self.net.extend(*[last_module])
+
+        #self.modules = nn.ModuleList(*[self.modules])
+        self.net = nn.ModuleList(*[self.net])
 
     def forward(self, input, skip_connections):
         out = input
+
+        # # Concatenate skip connections
+        # skip_id = len(skip_connections) - 1
+        # fFirst = True
+        #
+        # for module in self.modules:
+        #
+        #     # First layer skip connect is just the output so skip it
+        #     if(fFirst == False):
+        #         # print("%d" % skip_id)
+        #         # print(out.shape)
+        #         # print(skip_connections[skip_id].shape)
+        #         out = torch.cat((skip_connections[skip_id], out), dim=1)
+        #         skip_id -= 1
+        #     else:
+        #         fFirst = False
+        #
+        #     #print(out.shape)
+        #     for layer in module:
+        #         out = layer(out)
 
         # Concatenate skip connections
         skip_id = len(skip_connections) - 1
         fFirst = True
 
-        for module in self.modules:
+        for layer in self.net:
+            out = layer(out)
 
-            # First layer skip connect is just the output so skip it
-            if(fFirst == False):
-                # print("%d" % skip_id)
-                # print(out.shape)
-                # print(skip_connections[skip_id].shape)
+            # If we just ran an upsample then plop in the skipperoonie
+            if (isinstance(layer, nn.Upsample)):
                 out = torch.cat((skip_connections[skip_id], out), dim=1)
                 skip_id -= 1
-            else:
-                fFirst = False
-
-            #print(out.shape)
-            for layer in module:
-                out = layer(out)
 
         return out
 
 class ConvUNet(Model):
-    def __init__(self, input_shape, scale=3, num_filters=32, *args, **kwargs):
+    def __init__(self, input_shape, output_shape, scale=3, num_filters=32, *args, **kwargs):
         super(ConvUNet, self).__init__(*args, **kwargs)
 
         # input shape is h, w, c
         self.input_shape = input_shape
+        self.output_shape = output_shape
         self.scale = scale
         self.num_filters = num_filters
+
         self.ssim_loss = SSIMModule(
             window_size=11,
-            sigma=1.5
+            sigma=1.5,
+            c1=1e-4,
+            c2=9e-4,
+            fSizeAverage=True
         )
 
         # Set up the encoder and decoder
@@ -183,7 +221,7 @@ class ConvUNet(Model):
         )
 
         self.decoder = ConvUNetDecoder(
-            output_shape=self.input_shape,
+            output_shape=self.output_shape,
             scale=self.scale,
             num_filters=self.num_filters
         )
@@ -206,6 +244,7 @@ class ConvUNet(Model):
     def loss(self, in_x, target_x):
         in_x = in_x.permute(0, 3, 1, 2)
         target_x = target_x.permute(0, 3, 1, 2)
+        #target_x = (target_x * 2.0) - 1.0
 
         # shift to [-1, 1]
         out = in_x
@@ -219,26 +258,31 @@ class ConvUNet(Model):
         #print(out.shape)
         out = self.decoder(out, skip)
 
+        #out = out * 0.5 + 0.5
+
         #print(out.shape)
-        loss = self.ssim_loss.forward(out, target_x)
+        loss = 1.0 - self.ssim_loss.forward(out, target_x)
 
         return loss
 
-    # def sample(self, n_samples):
-    #     images = []
-    #
-    #     with torch.no_grad():
-    #         z = torch.randn(n_samples, self.latent_dim)
-    #         samples = torch.clamp(self.decoder.forward(z), -1.0, 1.0)
-    #
-    #     #samples = x.cpu().permute(0, 2, 3, 1).numpy() * 0.5 + 0.5
-    #
-    #     for x in samples:
-    #         x = x.squeeze().permute(1, 2, 0) * 0.5 + 0.5
-    #         newImage = image(torchBuffer=x)
-    #         images.append(newImage)
-    #
-    #     return images
+    def loss_with_frame(self, frameObject, targetFrameObject):
+        # Grab the torch tensor from the frame (this may be a particularly deep tensor)
+        npFrameBuffer = frameObject.GetNumpyBuffer()
+        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+
+        # Grab the torch tensor from the frame (this may be a particularly deep tensor)
+        npTargetFrameBuffer = targetFrameObject.GetNumpyBuffer()
+        torchTargetImageBuffer = torch.FloatTensor(npTargetFrameBuffer)
+        torchTargetImageBuffer = torchTargetImageBuffer.unsqueeze(0)
+
+        # Run the model
+        torchLoss = self.loss(
+            torchImageBuffer, torchTargetImageBuffer
+        )
+
+        # return an image
+        return torchLoss
 
     def forward_with_frame(self, frameObject):
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
@@ -246,9 +290,10 @@ class ConvUNet(Model):
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
         torchImageBuffer = torchImageBuffer.unsqueeze(0)
 
-        # Run the model
+        # Run the model (squeeze, permute and shift)
         torchOutput = self.forward(torchImageBuffer)
-        torchOutput = torchOutput.squeeze()
+        #torchOutput = torchOutput.squeeze().permute(1, 2, 0) * 0.5 + 0.5
+        torchOutput = torchOutput.squeeze().permute(1, 2, 0)
 
         # return an image
         return image(torchBuffer=torchOutput)
