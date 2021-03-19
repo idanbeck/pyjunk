@@ -74,7 +74,9 @@ class image_transform_whiten(image_transform):
 
         # First get into correct set up (w, h last dims)
         X = inImage.npImageBuffer
-        X.transpose(0, 1, 2)
+
+        if(X.ndim > 2):
+            X.transpose(0, 1, 2)
 
         # Put into a design matrix
         X = X.reshape(1, width * height * channels)

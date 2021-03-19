@@ -7,7 +7,10 @@ from repos.pyjunk.junktools.image import image
 
 from repos.pyjunk.models.ConvUNet import ConvUNet
 
+from repos.pyjunk.models.modules.VGGLoss import VGGLoss
+
 import math
+import kornia
 
 class SSFeatExtract(nn.Module):
     def __init__(self, input_shape, num_filters=32, out_features=8, *args, **kwargs):
@@ -80,11 +83,17 @@ class SupersamplingUNet(Model):
             num_filters=32
         )
 
+        self.vgg_loss = VGGLoss(requires_grad=False)
+
     def forward(self, input):
+        ycbcr = kornia.color.RgbToYcbcr()
+        rgb = kornia.color.YcbcrToRgb()
+
         input = input.permute(0, 3, 1, 2)
 
         # shift into [-1, 1]
         out = input
+        out = ycbcr(out)
         out = (out * 2.0) - 1.0
 
         # Feature extract
@@ -105,16 +114,26 @@ class SupersamplingUNet(Model):
         #print(out.shape)
         out = self.unet.decoder(out, skip)
 
+        # Convert back to rgb for output
+        out = rgb(out * 0.5 + 0.5)
+
         #print(out.shape)
         return out
 
     def loss(self, in_x, target_x):
+        ycbcr = kornia.color.RgbToYcbcr()
+        rgb = kornia.color.YcbcrToRgb()
+
         B, C, H, W = target_x.shape
         in_x = in_x.permute(0, 3, 1, 2)
-        target_x = target_x.permute(0, 3, 1, 2)
+        in_x_ycbcr = ycbcr(in_x)
+
+
+        target_x_rgb = target_x.permute(0, 3, 1, 2)
+        target_x_ycbcr = ycbcr(target_x_rgb)
 
         # shift to [-1, 1]
-        out = in_x
+        out = in_x_ycbcr
         out = (out * 2.0) - 1.0
 
         # Feature extract
@@ -130,9 +149,21 @@ class SupersamplingUNet(Model):
 
         # decode
         out = self.unet.decoder(out, skip)
+        out = out * 0.5 + 0.5
 
         #loss = 1.0 - self.unet.ssim_loss.forward(out, target_x)
-        loss = (1.0 - self.unet.ssim_loss.forward(out, target_x)) + 0.25 * torch.norm(out - target_x, 1)*(1.0/(C * H * W))
+        #loss = (1.0 - self.unet.ssim_loss.forward(out, target_x)) + 0.25 * torch.norm(out - target_x, 1)*(1.0/(C * H * W))
+
+        #ssim_loss = 0.5 * (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
+        ssim_loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
+        ssim_loss = ssim_loss.mean(1).mean(1).mean(1)
+
+        out_rgb = rgb(out)
+        vgg_loss = self.vgg_loss.loss(out_rgb, target_x_rgb)
+        # print(vgg_loss)
+
+        loss = ssim_loss + vgg_loss
+        #loss = ssim_loss
 
         return loss
 
@@ -156,6 +187,7 @@ class SupersamplingUNet(Model):
         return torchLoss
 
     def forward_with_frame(self, frameObject):
+
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)

@@ -21,17 +21,22 @@ class SpatialViewCondConvEncoder(nn.Module):
         # input shape is h, w, c
         H, W, C = input_shape
 
+        # TODO: programatic scale factor plz
+
+        #scale_factor = 3
+        #dim_mult = H // 3
+
         print(C)
 
         # Construct the net
         self.net = [
             nn.Conv2d(C, 32, 3, 1, 1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, 3, 2, 1),  # 16 x 16
+            nn.Conv2d(32, 64, 3, 2, 1),  # 32 x 32
             nn.ReLU(),
-            nn.Conv2d(64, 128, 3, 2, 1),  # 8 x 8
+            nn.Conv2d(64, 128, 3, 2, 1),  # 16 x 16
             nn.ReLU(),
-            nn.Conv2d(128, 256, 3, 2, 1),  # 4 x 4
+            nn.Conv2d(128, 256, 3, 2, 1),  # 8 x 8
             nn.ReLU(),
             nn.Flatten(),
             nn.Linear(

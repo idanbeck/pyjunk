@@ -7,6 +7,7 @@ from repos.pyjunk.junktools.image import image
 from repos.pyjunk.models.modules.SSIMModule import SSIMModule
 
 import math
+import kornia # This is mainly for A/B testing SSIM and maybe the YCbCr shit
 
 class ConvUNetEncoder(nn.Module):
     def __init__(self, input_shape, scale=3, num_filters=32, *args, **kwargs):
@@ -231,10 +232,14 @@ class ConvUNet(Model):
         )
 
     def forward(self, input):
+        ycbcr = kornia.color.RgbToYcbcr()
+        rgb = kornia.color.YcbcrToRgb()
+
         input = input.permute(0, 3, 1, 2)
 
         # shift into [-1, 1]
         out = input
+        out = ycbcr(out)
         out = (out * 2.0) - 1.0
 
         # encode
@@ -243,15 +248,23 @@ class ConvUNet(Model):
         # decode
         out = self.decoder.forward(out, skip_connections)
 
+        # Convert back to rgb for output
+        out = rgb(out * 0.5 + 0.5)
+
         return out
 
     def loss(self, in_x, target_x):
+        ycbcr = kornia.color.RgbToYcbcr()
+        rgb = kornia.color.YcbcrToRgb()
+
         in_x = in_x.permute(0, 3, 1, 2)
-        target_x = target_x.permute(0, 3, 1, 2)
-        #target_x = (target_x * 2.0) - 1.0
+        in_x_ycbcr = ycbcr(in_x)
+
+        target_x_rgb = target_x.permute(0, 3, 1, 2)
+        target_x_ycbcr = ycbcr(target_x_rgb)
 
         # shift to [-1, 1]
-        out = in_x
+        out = in_x_ycbcr
         out = (out * 2.0) - 1.0
 
         # encode
@@ -261,11 +274,14 @@ class ConvUNet(Model):
         # decode
         #print(out.shape)
         out = self.decoder(out, skip)
-
-        #out = out * 0.5 + 0.5
+        out = out * 0.5 + 0.5
+        #out = rgb(out * 0.5 + 0.5)
 
         #print(out.shape)
-        loss = 0.5 * (1.0 - self.ssim_loss.forward(out, target_x))
+        #loss = 0.5 * (1.0 - self.ssim_loss.forward(out, target_x))
+        loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
+        #loss = loss.mean(1).mean(1).mean(1)
+        loss = loss.mean()
 
         return loss
 

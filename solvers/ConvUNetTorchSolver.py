@@ -101,8 +101,8 @@ class ConvUNetTorchSolver(TorchSolver):
                     loss=test_loss
                 )
 
-            if(self.save_test_file_name != None and testImg != None):
-                testImg.SaveToFile(self.save_test_file_name)
+                if(self.save_test_file_name != None and testImg != None):
+                    testImg.SaveToFile(self.save_test_file_name)
 
 
         return training_losses, test_losses

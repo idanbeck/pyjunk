@@ -32,7 +32,7 @@ class frameset():
         self.W = 0
         self.H = 0
         self.C = 0
-        self.framsetJSON = None
+        self.framesetJSON = None
 
         if(strFramesetName != None):
             self.num_frames = num_frames
@@ -62,6 +62,7 @@ class frameset():
             self.W = sourceFrameset.W
             self.H = sourceFrameset.H
             self.C = sourceFrameset.C
+            self.framesetJSON = sourceFrameset.framesetJSON
 
             for sourceFrame in sourceFrameset.frames:
                 newFrame = frame(sourceFrame=sourceFrame, sourceChannels=sourceChannels)
@@ -166,7 +167,7 @@ class frameset():
         self.channel_names = framesetJSON['channels']
 
         # For posterity
-        self.framsetJSON = framesetJSON
+        self.framesetJSON = framesetJSON
 
         # TODO: This needs to be generalized, handled in the image.py code
         # since we drop the alpha channel
@@ -202,7 +203,8 @@ class frameset():
             frame.clear_transforms()
 
             # This is a bit hacky
-            self.W, self.H, self.C = self.framsetJSON['shape']
+            if(self.framesetJSON != None):
+                self.W, self.H, self.C = self.framesetJSON['shape']
 
     def square(self, max_size):
         for frame in self.frames:
