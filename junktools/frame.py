@@ -5,6 +5,7 @@ import torch
 
 from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.image import image
+import repos.pyjunk.junktools.pytorch_utils  as ptu
 
 import json
 import math
@@ -81,7 +82,8 @@ class frame():
         yaw_rad = math.atan2(vz, vx)        # yaw is about the y axis
 
         # Note: Might want to confirm these values
-        return torch.tensor(
+        #return torch.tensor(
+        return ptu.tensor(
             [x, y, z,
              math.cos(yaw_rad), math.sin(yaw_rad),
              math.cos(pitch_rad), math.sin(pitch_rad)]

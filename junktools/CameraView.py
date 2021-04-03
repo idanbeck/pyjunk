@@ -2,6 +2,8 @@ import torch
 import math
 import numpy as np
 
+import repos.pyjunk.junktools.pytorch_utils  as ptu
+
 # A simple Camera View object
 
 class CameraView():
@@ -25,7 +27,8 @@ class CameraView():
         yaw_rad = math.atan2(vz, vx)  # yaw is about the y axis
 
         # Note: Might want to confirm these values
-        return torch.tensor(
+        #return torch.tensor(
+        return ptu.tensor(
             [x, y, z,
              math.cos(yaw_rad), math.sin(yaw_rad),
              math.cos(pitch_rad), math.sin(pitch_rad)], dtype=torch.float32

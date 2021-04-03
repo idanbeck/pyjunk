@@ -8,6 +8,8 @@ import random
 import numpy as np
 import random
 
+from tqdm import trange, tqdm_notebook
+
 from repos.pyjunk.junktools import utils
 
 from repos.pyjunk.solvers.TorchSolver import TorchSolver
@@ -126,7 +128,10 @@ class GQNTorchSolver(TorchSolver):
         sigma_i, sigma_f = 2.0, 0.7
         sigma = sigma_i
 
-        for epoch in range(self.epochs):
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+
+        #for epoch in range(self.epochs):
+        for epoch in pbar:
             train_losses = self.train_frameset(
                 train_frameset=train_frameset,
                 sigma = sigma
@@ -137,7 +142,10 @@ class GQNTorchSolver(TorchSolver):
             test_losses.append(test_loss)
 
             if(fVerbose):
-                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+                #print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                # print(strDesc)
+                pbar.set_description(strDesc)
 
             # Pixel-variance annealing
             sigma = max(sigma_f + (sigma_i - sigma_f) * (1 - epoch / (2e5)), sigma_f)

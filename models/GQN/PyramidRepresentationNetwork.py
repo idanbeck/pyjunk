@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+import repos.pyjunk.junktools.pytorch_utils  as ptu
+
 # Pyramid Representation Network
 
 class PyramidRepresentationNetwork(nn.Module):
@@ -16,7 +18,7 @@ class PyramidRepresentationNetwork(nn.Module):
             nn.ReLU(),
             nn.Conv2d(128, 256, kernel_size=8, stride=8),
             nn.ReLU(),
-        )
+        ).to(ptu.GetDevice())
 
     def forward(self, input, in_view):
         # broadcast view

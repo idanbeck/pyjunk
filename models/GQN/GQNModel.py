@@ -9,43 +9,50 @@ from repos.pyjunk.models.GQN.TowerRepresentationNetwork import TowerRepresentati
 from repos.pyjunk.models.GQN.PyramidRepresentationNetwork import PyramidRepresentationNetwork
 from repos.pyjunk.models.GQN.GQNCores import *
 
+import repos.pyjunk.junktools.pytorch_utils  as ptu
+
 # Generative Query Network Model
 
 class GQNModel(Model):
     def __init__(self, representation="pyramid", num_layers=12, fSharedCore=False, *args, **kwargs):
-        super(GQNModel, self).__init__(*args, **kwargs)
 
         self.num_layers = num_layers
         self.representation = representation.lower()
+        self.fSharedCore = fSharedCore
 
-        if(self.representation == "pyramid"):
-            self.representation_network = PyramidRepresentationNetwork()
-        elif(self.representation == "tower"):
-            self.representation_network = TowerRepresentationNetwork(fPoolingEnabled=False)
-        elif(self.representation == "pool"):
-            self.representation_network = TowerRepresentationNetwork(fPoolingEnabled=True)
+        super(GQNModel, self).__init__(*args, **kwargs)
+
+    def ConstructModel(self):
+        # use in fp16 precision
+        #self.half()
+
+        if (self.representation == "pyramid"):
+            self.representation_network = PyramidRepresentationNetwork().to(ptu.GetDevice())
+        elif (self.representation == "tower"):
+            self.representation_network = TowerRepresentationNetwork(fPoolingEnabled=False).to(ptu.GetDevice())
+        elif (self.representation == "pool"):
+            self.representation_network = TowerRepresentationNetwork(fPoolingEnabled=True).to(ptu.GetDevice())
         else:
             self.representation_network = None
             raise NotImplementedError
 
-        self.fSharedCore = fSharedCore
-        if(self.fSharedCore):
-            self.inference_core = InferenceCore()
-            self.generation_core = GenerationCore()
+        if (self.fSharedCore):
+            self.inference_core = InferenceCore().to(ptu.GetDevice())
+            self.generation_core = GenerationCore().to(ptu.GetDevice())
         else:
             self.inference_core = []
             self.generation_core = []
 
             for l in range(self.num_layers):
-                self.inference_core.append(InferenceCore(id=l))
-                self.generation_core.append(GenerationCore(id=l))
+                self.inference_core.append(InferenceCore(id=l).to(ptu.GetDevice()))
+                self.generation_core.append(GenerationCore(id=l).to(ptu.GetDevice()))
 
             self.inference_core = nn.ModuleList([*self.inference_core])
             self.generation_core = nn.ModuleList([*self.generation_core])
 
-        self.eta_pi = nn.Conv2d(128, 2 * 3, kernel_size=5, stride=1, padding=2)
-        self.eta_generation = nn.Conv2d(128, 3, kernel_size=1, stride=1, padding=0)
-        self.eta_inference = nn.Conv2d(128, 3 * 2, kernel_size=5, stride=1, padding=2)
+        self.eta_pi = nn.Conv2d(128, 2 * 3, kernel_size=5, stride=1, padding=2).to(ptu.GetDevice())
+        self.eta_generation = nn.Conv2d(128, 3, kernel_size=1, stride=1, padding=0).to(ptu.GetDevice())
+        self.eta_inference = nn.Conv2d(128, 3 * 2, kernel_size=5, stride=1, padding=2).to(ptu.GetDevice())
 
     def loss(self, in_x, in_view, query_view, query_x, gen_sigma):
         in_x = in_x.permute(0, 3, 1, 2)
@@ -129,10 +136,10 @@ class GQNModel(Model):
         mu_gen = self.eta_generation(u)
         gen_distro = torch.distributions.Normal(mu_gen, gen_sigma)
 
-        ll_loss = gen_distro.log_prob(query_x)
-        print("ll_loss: %d" % torch.sum(ll_loss, dim=[1, 2, 3]).item())
+        nll_loss = gen_distro.log_prob(query_x)
+        print("nll_loss: %d" % torch.sum(nll_loss, dim=[1, 2, 3]).item())
 
-        elbo_loss += torch.sum(ll_loss, dim=[1, 2, 3])
+        elbo_loss += torch.sum(nll_loss, dim=[1, 2, 3])
 
         # From paper (section 2 - Optimization)
         elbo_loss = -elbo_loss
@@ -284,7 +291,8 @@ class GQNModel(Model):
         torchContextViewBuffer = None
         for f in in_frames:
             npFrameBuffer = f.GetNumpyBuffer()
-            torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            #torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            torchImageBuffer = ptu.GetFloatTensorFromNumpy(npFrameBuffer)
             if (torchContextImageBuffer == None):
                 torchContextImageBuffer = torchImageBuffer.unsqueeze(0)
             else:
@@ -325,7 +333,8 @@ class GQNModel(Model):
         torchContextViewBuffer = None
         for f in in_frames:
             npFrameBuffer = f.GetNumpyBuffer()
-            torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            #torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            torchImageBuffer = ptu.GetFloatTensorFromNumpy(npFrameBuffer)
             if(torchContextImageBuffer == None):
                 torchContextImageBuffer = torchImageBuffer.unsqueeze(0)
             else:
@@ -344,7 +353,8 @@ class GQNModel(Model):
 
         # Retrieve Query Image Buffer
         npFrameBuffer = query_frame.GetNumpyBuffer()
-        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        #torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        torchImageBuffer = ptu.GetFloatTensorFromNumpy(npFrameBuffer)
         torchQueryImageBuffer = torchImageBuffer.unsqueeze(0)
         torchQueryViewBuffer = query_frame.GetFrameCameraView().unsqueeze(0)
 

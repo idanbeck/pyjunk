@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import random
 
 import numpy as np
+from tqdm import trange, tqdm_notebook
 
 from repos.pyjunk.junktools import utils
 
@@ -135,7 +136,10 @@ class SimpleTorchSolver(TorchSolver):
         training_losses = []
         test_losses = []
 
-        for epoch in range(self.epochs):
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+
+        #for epoch in range(self.epochs):
+        for epoch in pbar:
             train_losses = self.train_images(train_data_images)
             training_losses.extend(train_losses)
 
@@ -143,7 +147,11 @@ class SimpleTorchSolver(TorchSolver):
             test_losses.append(test_loss)
 
             if (fVerbose):
-                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                # print(strDesc)
+                pbar.set_description(strDesc)
+
+        pbar.close()
 
         return training_losses, test_losses
 
@@ -151,7 +159,10 @@ class SimpleTorchSolver(TorchSolver):
         training_losses = []
         test_losses = []
 
-        for epoch in range(self.epochs):
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+
+        #for epoch in range(self.epochs):
+        for epoch in pbar:
             train_losses = self.train_frames(train_data)
             training_losses.extend(train_losses)
 
@@ -159,7 +170,11 @@ class SimpleTorchSolver(TorchSolver):
             test_losses.append(test_loss)
 
             if(fVerbose):
-                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                #print(strDesc)
+                pbar.set_description(strDesc)
+
+        pbar.close()
 
         return training_losses, test_losses
 
@@ -171,7 +186,10 @@ class SimpleTorchSolver(TorchSolver):
         training_losses = []
         test_losses = []
 
-        for epoch in range(self.epochs):
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+
+        #for epoch in range(self.epochs):
+        for epoch in pbar:
             train_losses = self.train_frameset(
                 train_source_frameset=train_source_frameset,
                 train_target_frameset=train_target_frameset,
@@ -185,13 +203,17 @@ class SimpleTorchSolver(TorchSolver):
             test_losses.append(test_loss)
 
             if(fVerbose):
-                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                # print(strDesc)
+                pbar.set_description(strDesc)
+
+        pbar.close()
 
         return training_losses, test_losses
 
-    def train_and_visualize_images(self, train_data_images, test_data_images, strTitle="Train, Test Loss Plot"):
+    def train_and_visualize_images(self, train_data_images, test_data_images, strTitle="Train, Test Loss Plot", fVerbose=False):
         # Train and evaluate the model
-        training_losses, test_losses = self.train_for_epochs_images(train_data_images, test_data_images)
+        training_losses, test_losses = self.train_for_epochs_images(train_data_images, test_data_images, fVerbose=fVerbose)
 
         # Visualize Plot
         self.visualize_train_test_plot(training_losses, test_losses, strTitle=strTitle)
@@ -202,9 +224,9 @@ class SimpleTorchSolver(TorchSolver):
         # Play a sound when done
         return utils.beep()
 
-    def train_and_visualize_frames(self, train_data, test_data, strTitle="Train and Test Loss Plot"):
+    def train_and_visualize_frames(self, train_data, test_data, strTitle="Train and Test Loss Plot", fVerbose=False):
         # Train and eval the model
-        training_losses, test_losses = self.train_for_epochs_frames(train_data, test_data)
+        training_losses, test_losses = self.train_for_epochs_frames(train_data, test_data, fVerbose=fVerbose)
 
         # Visualize Plot
         self.visualize_train_test_plot(training_losses, test_losses, strTitle=strTitle)

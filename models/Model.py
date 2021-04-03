@@ -4,11 +4,15 @@ import torch.nn as nn
 # Base Model class
 
 from repos.pyjunk.junktools.image import image
+import repos.pyjunk.junktools.pytorch_utils  as ptu
 
 class Model(nn.Module):
     def __init__(self, *args,  **kwargs):
         super(Model, self).__init__(*args, **kwargs)
         self.net = []
+        self.ConstructModel()
+        self.to(ptu.GetDevice())
+
 
     def VisualizeModel(self):
         pass
@@ -54,10 +58,12 @@ class Model(nn.Module):
     def forward_with_image(self, imageObject):
         # Convert to torch tensor
         npImageBuffer = imageObject.npImageBuffer
-        torchImageBuffer = torch.FloatTensor(npImageBuffer)
+        #torchImageBuffer = torch.FloatTensor(npImageBuffer).unsqueeze(0)
+        torchImageBuffer = ptu.GetFloatTensorFromNumpy(npImageBuffer).unsqueeze(0)
 
         # Run the model
-        torchOutput = self.forward(torchImageBuffer)
+        torchOutput = self.forward(torchImageBuffer).squeeze(0)
+        print(torchOutput.shape)
 
         # return an image
         return image(torchBuffer=torchOutput)
@@ -77,7 +83,8 @@ class Model(nn.Module):
     def loss_with_image(self, imageObject):
         # Convert to torch tensor
         npImageBuffer = imageObject.npImageBuffer
-        torchImageBuffer = torch.FloatTensor(npImageBuffer)
+        #torchImageBuffer = torch.FloatTensor(npImageBuffer)
+        torchImageBuffer = ptu.GetFloatTensorFromNumpy(npImageBuffer).unsqueeze(0)
 
         # loss
         torchLoss = self.loss(torchImageBuffer)

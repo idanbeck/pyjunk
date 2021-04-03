@@ -3,6 +3,8 @@ import torch.nn as nn
 
 import torch.nn.functional as F
 
+import repos.pyjunk.junktools.pytorch_utils  as ptu
+
 # Tower Representation Network
 
 class TowerRepresentationNetwork(nn.Module):
@@ -10,18 +12,18 @@ class TowerRepresentationNetwork(nn.Module):
         super(TowerRepresentationNetwork, self).__init__(*args, **kwargs)
         self.fPooling = fPoolingEnabled
 
-        self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2)
-        self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2)
-        self.conv3 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1)
-        self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2)
+        self.conv1 = nn.Conv2d(3, 256, kernel_size=2, stride=2).to(ptu.GetDevice())
+        self.conv2 = nn.Conv2d(256, 256, kernel_size=2, stride=2).to(ptu.GetDevice())
+        self.conv3 = nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1).to(ptu.GetDevice())
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2).to(ptu.GetDevice())
 
-        self.conv5 = nn.Conv2d(256 + 7, 256, kernel_size=3, stride=1, padding=1)
-        self.conv6 = nn.Conv2d(256 + 7, 128, kernel_size=3, stride=1, padding=1)
-        self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
-        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1)
+        self.conv5 = nn.Conv2d(256 + 7, 256, kernel_size=3, stride=1, padding=1).to(ptu.GetDevice())
+        self.conv6 = nn.Conv2d(256 + 7, 128, kernel_size=3, stride=1, padding=1).to(ptu.GetDevice())
+        self.conv7 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1).to(ptu.GetDevice())
+        self.conv8 = nn.Conv2d(256, 256, kernel_size=1, stride=1).to(ptu.GetDevice())
 
         if(self.fPooling):
-            self.pool = nn.AvgPool2d(16)
+            self.pool = nn.AvgPool2d(16).to(ptu.GetDevice())
 
 
     def forward(self, input, in_view):
@@ -34,7 +36,8 @@ class TowerRepresentationNetwork(nn.Module):
         representation = F.relu(self.conv4(representation)) + skip_out
 
         # Broadcast
-        in_view = in_view.view(in_view.size(0), 7, 1, 1).repeat(1, 1, 16, 16)
+        #in_view = in_view.view(in_view.size(0), 7, 1, 1).repeat(1, 1, 16, 16)
+        in_view = in_view.view(-1, 7, 1, 1).repeat(1, 1, 64, 64)
 
         # Residual and concatenate with broadcast view
         skip_input = torch.cat((representation, in_view), dim=1)

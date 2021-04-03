@@ -4,20 +4,20 @@ import torch.nn as nn
 from repos.pyjunk.models.Model import Model
 from repos.pyjunk.models.modules.MLPBlock import MLPBlock
 
+import repos.pyjunk.junktools.pytorch_utils as ptu
+
 # Simple MLP model
 
 class SimpleMLP(Model):
     def __init__(self, dim_input, dim_output, dim_inner, n_blocks, n_layers, fResidual=False, *args, **kwargs):
-        super(SimpleMLP, self).__init__(*args, **kwargs)
         self.n_blocks = n_blocks
         self.n_layers = n_layers
         self.dim_input = dim_input
         self.dim_output = dim_output
         self.dim_inner = dim_inner
         self.fResidual = fResidual
+        super(SimpleMLP, self).__init__(*args, **kwargs)
 
-        self.net = []
-        self.ConstructModel()
 
     def ConstructModel(self):
         self.net = []
@@ -38,6 +38,7 @@ class SimpleMLP(Model):
         # eliminate the last baddie
         self.net.pop()
         self.net = nn.ModuleList([*self.net])
+
 
     def forward(self, torchInput):
         # Flatten for MLP
@@ -66,7 +67,8 @@ class SimpleMLP(Model):
         loss = l1_reconstruction_loss(torchInput, out)
 
         l2_lambda = 0.01
-        l2_reg = torch.tensor(0.)
+        #l2_reg = torch.tensor(0.)
+        l2_reg = ptu.tensor(0.)
         for param in self.parameters():
             l2_reg += torch.norm(param)
         loss += l2_lambda * l2_reg
@@ -83,7 +85,8 @@ class SimpleMLP(Model):
         loss = l1_reconstruction_loss(torchTargetImageBuffer, out)
 
         l2_lambda = 0.01
-        l2_reg = torch.tensor(0.)
+        # l2_reg = torch.tensor(0.)
+        l2_reg = ptu.tensor(0.)
         for param in self.parameters():
             l2_reg += torch.norm(param)
         loss += l2_lambda * l2_reg
