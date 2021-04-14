@@ -26,7 +26,7 @@ class BiGANGenerator(nn.Module):
             i += 1
             self.net.append(nn.Linear(h1, h2))
             if(i % 2 == 0):
-                self.net.append(nn.BatchNorm(h2, affine=False))
+                self.net.append(nn.BatchNorm1d(h2, affine=False))
             self.net.append(nn.ReLU())
 
         self.net.append(nn.Linear(self.hidden_size, self.output_dim))
@@ -50,7 +50,7 @@ class BiGANGenerator(nn.Module):
 
 class BiGANDiscriminator(nn.Module):
     def __init__(self, input_dim, z_dim, output_dim, n_layers=2, hidden_size=1024, *args, **kwargs):
-        super(BiGANGenerator, self).__init__(*args, **kwargs)
+        super(BiGANDiscriminator, self).__init__(*args, **kwargs)
         self.input_dim = input_dim
         self.z_dim = z_dim
         self.output_dim = output_dim
@@ -70,7 +70,7 @@ class BiGANDiscriminator(nn.Module):
             i += 1
             self.net.append(nn.Linear(h1, h2))
             if (i % 2 == 0):
-                self.net.append(nn.BatchNorm(h2, affine=False))
+                self.net.append(nn.BatchNorm1d(h2, affine=False))
             self.net.append(nn.LeakyReLU(0.2))
 
         self.net.append(nn.Linear(self.hidden_size, self.output_dim))
@@ -106,7 +106,7 @@ class BiGANEncoder(nn.Module):
             i += 1
             self.net.append(nn.Linear(h1, h2))
             if (i % 2 == 0):
-                self.net.append(nn.BatchNorm(h2, affine=False))
+                self.net.append(nn.BatchNorm1d(h2, affine=False))
             self.net.append(nn.LeakyReLU(0.2))
 
         self.net.append(nn.Linear(self.hidden_size, self.output_dim))
@@ -121,10 +121,9 @@ class BiGANEncoder(nn.Module):
         return out
 
 class BiGAN(Model):
-    def __init__(self, input_shape, output_dim, n_classes, latent_dim=50, n_layers=2, hidden_size=1024, *args, **kwargs):
+    def __init__(self, input_shape, n_classes, latent_dim=50, n_layers=2, hidden_size=1024, *args, **kwargs):
         self.input_shape = input_shape
         self.latent_dim = latent_dim
-        self.output_dim = output_dim
         self.n_classes = n_classes
         self.n_layers = n_layers
         self.hidden_size = hidden_size
@@ -135,22 +134,29 @@ class BiGAN(Model):
         img_dim = C * H * W
 
         self.generator = BiGANGenerator(
-            input_dim=self.latent_dim, output_dim=self.img_dim,
-            n_layers=self.n_layers, hidden_size=self.hidden_size
+            input_dim=self.latent_dim,
+            output_dim=img_dim,
+            n_layers=self.n_layers,
+            hidden_size=self.hidden_size
         )
 
         self.critic = BiGANDiscriminator(
-            input_dim=img_dim, z_dim=self.latent_dim, output_dim=1,
-            n_layers=self.n_layers, hidden_size=self.hidden_size
+            input_dim=img_dim,
+            z_dim=self.latent_dim,
+            output_dim=1,
+            n_layers=self.n_layers,
+            hidden_size=self.hidden_size
         )
 
-        self.encoder = BiGANEncoder(
-            input_dim=img_dim, output_dim=self.latent_dim,
-            n_layers=self.n_layers, hidden_size=self.hidden_size
-        )
+        # self.encoder = BiGANEncoder(
+        #     input_dim=img_dim,
+        #     output_dim=self.latent_dim,
+        #     n_layers=self.n_layers,
+        #     hidden_size=self.hidden_size
+        # )
 
         # linear classifier
-        self.linear_classifier = nn.Linear(self.output_dim, self.n_classes)
+        self.linear_classifier = nn.Linear(img_dim, self.n_classes)
         #self.linear_optimizer = optim.Adam(self.linear_classifier.parameters(), lr=1e-3)
 
     def critic_loss(self, input):
