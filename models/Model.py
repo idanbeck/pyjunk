@@ -72,7 +72,7 @@ class Model(nn.Module):
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
-        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
 
         # Run the model
         torchLoss = self.loss(torchImageBuffer)

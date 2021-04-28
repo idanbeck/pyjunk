@@ -1,6 +1,10 @@
 from repos.pyjunk.junktools import utils
 
 import imageio
+
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 import numpy as np
 from torchvision.utils import make_grid
 import torch
@@ -39,6 +43,7 @@ class image():
             self.npImageBuffer = None
             self.load_state = self.states.not_loaded
             self.fVerbose = fVerbose
+            self._shape = None
 
             self.strFrameID = strFrameID
             self.strFramesetName = strFramesetName
@@ -98,13 +103,20 @@ class image():
                 raise NotImplementedError
 
             self.npImageBuffer = np.array(imageio.imread(self.strFilepath))
-            width, height, channels = self.shape()
+            if(len(self.shape()) == 3):
+                width, height, channels = self.shape()
+            else:
+                width, height = self.shape()
+                channels = 1
+
             self.npImageBuffer = resize(self.npImageBuffer, (width, height))
 
             # Drop the alpha channel if it exists
             if (channels > 3):
                 # print("removing alpha channel")
                 self.npImageBuffer = self.npImageBuffer[:, :, 0:3]
+            elif(channels == 1):
+                self.npImageBuffer = np.expand_dims(self.npImageBuffer, axis=2)
 
             # Apply image transformations
             if(self.fJITLoading == True):
@@ -138,7 +150,24 @@ class image():
             return self.npImageBuffer
 
         def shape(self):
-            return self.npImageBuffer.shape
+            if(self._shape == None):
+
+                npImageBuffer = self.GetNumpyBuffer()
+                if (not isinstance(self.npImageBuffer, np.ndarray)):
+                    raise BufferError
+
+                self._shape = npImageBuffer.shape
+
+            return self._shape
+            #
+            # self._shape = npImageBuffer.shape
+            # print(self._shape)
+            #
+            # if (self.fJITLoading == True):
+            #     self.UnloadImage()
+            #
+            # return self._shape
+            #return self.npImageBuffer.shape
 
         def width(self):
             return self.npImageBuffer.shape[0]

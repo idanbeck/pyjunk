@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import random
 
+from tqdm import trange, tqdm_notebook
+
 import numpy as np
 
 from repos.pyjunk.junktools import utils
@@ -25,11 +27,16 @@ class ConvVAETorchSolver(TorchSolver):
         idx = [*range(train_frameset.num_frames)]
         random.shuffle(idx)
         idx = idx[:self.batch_size]
-        print("training on frames %s in frameset %s" % (idx, train_frameset.strFramesetName))
+        #print("training on frames %s in frameset %s" % (idx, train_frameset.strFramesetName))
 
         frames = [train_frameset[i] for i in idx]
 
-        for frame in frames:
+        pbar = tqdm_notebook(frames, desc='training on frame', leave=False)
+
+        #for frame in frames:
+        for frame in pbar:
+            strDesc = f'training on frame {frame.strFrameID}'
+            pbar.set_description(strDesc)
             loss = self.model.loss_with_frame(frame)
 
             self.optimizer.zero_grad()
@@ -50,14 +57,19 @@ class ConvVAETorchSolver(TorchSolver):
         idx = [*range(test_frameset.num_frames)]
         random.shuffle(idx)
         idx = idx[:self.test_batch_size]
-        print("testing on frames %s in frameset %s" % (idx, test_frameset.strFramesetName))
+        #print("testing on frames %s in frameset %s" % (idx, test_frameset.strFramesetName))
 
         frames = [test_frameset[i] for i in idx]
 
         with torch.no_grad():
             #loss += self.model.loss_with_frameset_and_target(test_source_frameset, test_target_frameset)
 
-            for frame in frames:
+            pbar = tqdm_notebook(frames, desc='testing on frame', leave=False)
+
+            # for frame in frames:
+            for frame in pbar:
+                strDesc = f'testing on frame {frame.strFrameID}'
+                pbar.set_description(strDesc)
                 loss += self.model.loss_with_frame(frame)
 
             loss /= self.test_batch_size
@@ -73,7 +85,10 @@ class ConvVAETorchSolver(TorchSolver):
         training_losses = []
         test_losses = []
 
-        for epoch in range(self.epochs):
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+
+        #for epoch in range(self.epochs):
+        for epoch in pbar:
             train_losses = self.train_frameset(
                 train_frameset=train_frameset
             )
@@ -82,8 +97,9 @@ class ConvVAETorchSolver(TorchSolver):
             test_loss = self.test_frameset(test_frameset)
             test_losses.append(test_loss)
 
-            if(fVerbose):
-                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+            if (fVerbose):
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                pbar.set_description(strDesc)
 
         return training_losses, test_losses
 

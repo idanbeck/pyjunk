@@ -8,6 +8,7 @@ from repos.pyjunk.junktools import utils
 from repos.pyjunk.junktools.frame import frame
 
 from repos.pyjunk.junktools.image_transform import image_transform_square
+from tqdm import trange, tqdm_notebook
 
 class frameset():
     def __init__(self,
@@ -33,9 +34,13 @@ class frameset():
         self.H = 0
         self.C = 0
         self.framesetJSON = None
+        self._shape = None
 
         if(strFramesetName != None):
-            self.num_frames = num_frames
+            if(num_frames != None):
+                self.num_frames = num_frames
+            else:
+                self.num_frames = None
             self.strFramesetName = strFramesetName
             self.LoadFrames(strFramesetName)
 
@@ -143,7 +148,10 @@ class frameset():
         # Save the frames
         print("Saving frames %d to %d" % (self.start_frame, self.end_frame))
 
-        for idx, frame in enumerate(self.frames):
+        pbar = tqdm_notebook(self.frames, desc="frame", leave=False)
+
+        #for idx, frame in enumerate(self.frames):
+        for idx, frame in enumerate(pbar):
             frame.SaveFrame(strPath, strExtension)
             frame.Unload()
 
@@ -156,9 +164,12 @@ class frameset():
         framesetJSON = utils.LoadFramesetJSON(strFramesetName)
 
         self.start_frame = int(framesetJSON['start_frame'])
-        self.end_frame = framesetJSON['end_frame'] if \
-            (self.num_frames is None) or (self.start_frame + self.num_frames) >= framesetJSON['end_frame'] \
-            else self.start_frame + self.num_frames
+        if((self.num_frames is None) or (self.start_frame + self.num_frames) >= framesetJSON['end_frame']):
+            self.end_frame = framesetJSON['end_frame']
+            self.num_frames = self.end_frame - self.start_frame
+        else:
+            self.end_frame = self.start_frame + self.num_frames
+
         self.end_frame = int(self.end_frame)
         self.strName = framesetJSON['name']
         self.W, self.H, self.C = framesetJSON['shape']
@@ -177,7 +188,11 @@ class frameset():
 
         print("Loading frames %d to %d" % (self.start_frame, self.end_frame))
 
-        for frame_count in range(self.start_frame, self.end_frame):
+        pbar = tqdm_notebook(range(self.start_frame, self.end_frame), desc="frame", leave=False)
+
+        # for idx, frame in enumerate(self.frames):
+        #for frame_count in range(self.start_frame, self.end_frame):
+        for frame_count in pbar:
             if (self.fVerbose):
                 print("Loading: frame %d" % frame_count)
             strFrameID = str(frame_count)
@@ -239,29 +254,33 @@ class frameset():
                 f.visualize(strTitle=self.strFramesetName)
 
     def shape(self):
-        num_frames = len(self.frames)
-        height, width, channels = self.W, self.H, self.C * self.num_channels
+        if(self._shape == None):
+            num_frames = len(self.frames)
+            height, width, channels = self.frames[0].shape()
 
-        if(self.fJITLoading == False):
-            for f in self.frames:
-                H, W, C = f.shape()
+            if(self.fJITLoading == False):
+                for f in self.frames[1:]:
+                    H, W, C = f.shape()
+                    print(f.shape())
 
-                if (height == 0):
-                    height = H
-                elif (H != height):
-                    raise Exception("Height %d of frame %s doesn't match height %d of frameset" % (H, f.strFrameID, height))
+                    if (height == 0):
+                        height = H
+                    elif (H != height):
+                        raise Exception("Height %d of frame %s doesn't match height %d of frameset" % (H, f.strFrameID, height))
 
-                if (width == 0):
-                    width = W
-                elif (W != width):
-                    raise Exception("Width %d of frame %s doesn't match width %d of frameset" % (W, f.strFrameID, width))
+                    if (width == 0):
+                        width = W
+                    elif (W != width):
+                        raise Exception("Width %d of frame %s doesn't match width %d of frameset" % (W, f.strFrameID, width))
 
-                if (channels == 0):
-                    channels = C
-                elif (C != channels):
-                    raise Exception("Channels %d of frame %s doesn't match channels %d of frameset" % (C, f.strFrameID, channels))
+                    if (channels == 0):
+                        channels = C
+                    elif (C != channels):
+                        raise Exception("Channels %d of frame %s doesn't match channels %d of frameset" % (C, f.strFrameID, channels))
 
-        return (num_frames, height, width, channels)
+            self._shape = (num_frames, height, width, channels)
+
+        return self._shape
 
     # TODO: Add select_frames to allow for minibatching
     def GetNumpyBuffer(self, channels=None, select_frames=None):

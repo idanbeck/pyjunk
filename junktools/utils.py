@@ -108,6 +108,63 @@ def load_mnist(include_labels=False):
 
     return load_pickled_data(mnist_file_path, include_labels)
 
+def load_cifar(include_labels=False):
+
+    train_data = []
+    train_labels = []
+    test_data = []
+    test_labels = []
+
+    # Train data
+    for n_batch in range(1, 6):
+        strFilename = f"data_batch_{n_batch}"
+        cifar_file_path = join(
+            'repos',
+            'pyjunk',
+            'data',
+            'pickles',
+            'cifar-10-batches-py',
+            strFilename)
+
+        with open(cifar_file_path, 'rb') as fo:
+            dict = pickle.load(fo, encoding='bytes')
+
+        train_data.extend(dict[b'data'])
+        train_labels.extend(dict[b'labels'])
+        fo.close()
+
+    train_data = np.array(train_data)
+    train_data = train_data.reshape(-1, 3, 32, 32)
+    train_labels = np.array(train_labels)
+
+    strFilename = f"test_batch"
+    cifar_file_path = join(
+        'repos',
+        'pyjunk',
+        'data',
+        'pickles',
+        'cifar-10-batches-py',
+        strFilename)
+
+    with open(cifar_file_path, 'rb') as fo:
+        dict = pickle.load(fo, encoding='bytes')
+
+    test_data.extend(dict[b'data'])
+    test_labels.extend(dict[b'labels'])
+    fo.close()
+
+    test_data = np.array(test_data)
+    test_data = test_data.reshape(-1, 3, 32, 32)
+    test_labels = np.array(test_labels)
+
+    train_data = train_data.transpose(0, 2, 3, 1) / 255.0
+    test_data = test_data.transpose(0, 2, 3, 1) / 255.0
+
+    if(include_labels == False):
+        return train_data, test_data
+    else:
+        return train_data, train_labels, test_data, test_labels
+
 def LoadFramesetJSON(strFramesetName):
     strFramesetFilename = strFramesetName + '.json'
     strPath = join('repos', 'pyjunk', 'data', 'frames', strFramesetName)
@@ -130,11 +187,15 @@ def SaveNewFramesetJSON(strFramesetName, jsonData):
 
     return join(strPath, strFramesetFilename), strPath
 
-def visualize_data(data, indexes=None, size=100, nrow=10, nchannels=3):
-    if(indexes == None):
+def visualize_data(data, indexes=None, size=100, nrow=10, nchannels=3, fRandom=True):
+    if(indexes == None and fRandom == True):
         indexes = np.random.choice(len(data), replace=False, size=(size,))
+    else:
+        indexes = np.arange(size)
 
-    images = data[indexes].astype('float32') / nchannels * 255.0
+    #images = data[indexes].astype('float32') / nchannels * 255.0
+    images = data[indexes].astype('float32') * 255.0
+    #images = data[indexes]
 
     show_samples(images, nrow=nrow)
 

@@ -3,6 +3,8 @@ import torch.nn as nn
 
 from repos.pyjunk.models.Model import Model
 from repos.pyjunk.junktools.image import image
+import torch.optim as optim
+import repos.pyjunk.junktools.pytorch_utils  as ptu
 
 class BiGANGenerator(nn.Module):
     def __init__(self, input_dim, output_dim, n_layers=2, hidden_size=1024, *args, **kwargs):
@@ -18,21 +20,29 @@ class BiGANGenerator(nn.Module):
 
     def ConstructNetwork(self):
         self.net = []
-
-        layer_sizes = [self.input_dim] + [self.hidden_size] * self.n_layers
-
-        i = 0
-        for h1, h2 in zip(layer_sizes, layer_sizes[1:]):
-            i += 1
-            self.net.append(nn.Linear(h1, h2))
-            if(i % 2 == 0):
-                self.net.append(nn.BatchNorm1d(h2, affine=False))
-            self.net.append(nn.ReLU())
-
-        self.net.append(nn.Linear(self.hidden_size, self.output_dim))
-        self.net.append(nn.Tanh())
-
-        self.net = nn.ModuleList([*self.net])
+        self.net = nn.Sequential(
+            nn.Linear(self.input_dim, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024, affine=False),
+            nn.ReLU(),
+            nn.Linear(1024, 784),
+            nn.Tanh()
+        )
+        # layer_sizes = [self.input_dim] + [self.hidden_size] * self.n_layers
+        #
+        # i = 0
+        # for h1, h2 in zip(layer_sizes, layer_sizes[1:]):
+        #     i += 1
+        #     self.net.append(nn.Linear(h1, h2))
+        #     if(i % 2 == 0):
+        #         self.net.append(nn.BatchNorm1d(h2, affine=False))
+        #     self.net.append(nn.ReLU())
+        #
+        # self.net.append(nn.Linear(self.hidden_size, self.output_dim))
+        # self.net.append(nn.Tanh())
+        #
+        # self.net = nn.ModuleList([*self.net])
 
     def forward(self, input):
         out = input
@@ -43,7 +53,8 @@ class BiGANGenerator(nn.Module):
         return out
 
     def sample(self, n_samples):
-        z = self.noise_distribution.sample([n_samples, self.input_dim])
+        #z = self.noise_distribution.sample([n_samples, self.input_dim])
+        z = (torch.rand(n_samples, self.input_dim).to(ptu.GetDevice()) - 0.5) * 2.0
         samples = self.forward(z)
         return samples, z
 
@@ -62,24 +73,32 @@ class BiGANDiscriminator(nn.Module):
 
     def ConstructNetwork(self):
         self.net = []
-
-        layer_sizes = [(self.input_dim + self.z_dim)] + [self.hidden_size] * self.n_layers
-
-        i = 0
-        for h1, h2 in zip(layer_sizes, layer_sizes[1:]):
-            i += 1
-            self.net.append(nn.Linear(h1, h2))
-            if (i % 2 == 0):
-                self.net.append(nn.BatchNorm1d(h2, affine=False))
-            self.net.append(nn.LeakyReLU(0.2))
-
-        self.net.append(nn.Linear(self.hidden_size, self.output_dim))
-        self.net.append(nn.Sigmoid())
-
-        self.net = nn.ModuleList([*self.net])
+        self.net = nn.Sequential(
+            nn.Linear(self.input_dim + self.z_dim, 1024),
+            nn.LeakyReLU(0.2),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024, affine=False),
+            nn.LeakyReLU(0.2),
+            nn.Linear(1024, 1),
+            nn.Sigmoid()
+        )
+        # layer_sizes = [(self.input_dim + self.z_dim)] + [self.hidden_size] * self.n_layers
+        #
+        # i = 0
+        # for h1, h2 in zip(layer_sizes, layer_sizes[1:]):
+        #     i += 1
+        #     self.net.append(nn.Linear(h1, h2))
+        #     if (i % 2 == 0):
+        #         self.net.append(nn.BatchNorm1d(h2, affine=False))
+        #     self.net.append(nn.LeakyReLU(0.2))
+        #
+        # self.net.append(nn.Linear(self.hidden_size, self.output_dim))
+        # self.net.append(nn.Sigmoid())
+        #
+        # self.net = nn.ModuleList([*self.net])
 
     def forward(self, input, z):
-        out = torch.cat((input, z), dim=1)
+        out = torch.cat((z, input), dim=1)
         # out = out.view(input.shape[0], -1)  # flatten
         for layer in self.net:
             out = layer(out)
@@ -98,22 +117,29 @@ class BiGANEncoder(nn.Module):
 
     def ConstructNetwork(self):
         self.net = []
+        self.net = nn.Sequential(
+            nn.Linear(self.input_dim, 1024),
+            nn.LeakyReLU(0.2),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024, affine=False),
+            nn.LeakyReLU(0.2),
+            nn.Linear(1024, self.output_dim),
+        )
+        # layer_sizes = [self.input_dim] + [self.hidden_size] * self.n_layers
+        #
+        # i = 0
+        # for h1, h2 in zip(layer_sizes, layer_sizes[1:]):
+        #     i += 1
+        #     self.net.append(nn.Linear(h1, h2))
+        #     if (i % 2 == 0):
+        #         self.net.append(nn.BatchNorm1d(h2, affine=False))
+        #     self.net.append(nn.LeakyReLU(0.2))
+        #
+        # self.net.append(nn.Linear(self.hidden_size, self.output_dim))
+        #
+        # self.net = nn.ModuleList([*self.net])
 
-        layer_sizes = [self.input_dim] + [self.hidden_size] * self.n_layers
-
-        i = 0
-        for h1, h2 in zip(layer_sizes, layer_sizes[1:]):
-            i += 1
-            self.net.append(nn.Linear(h1, h2))
-            if (i % 2 == 0):
-                self.net.append(nn.BatchNorm1d(h2, affine=False))
-            self.net.append(nn.LeakyReLU(0.2))
-
-        self.net.append(nn.Linear(self.hidden_size, self.output_dim))
-
-        self.net = nn.ModuleList([*self.net])
-
-    def foward(self, input):
+    def forward(self, input):
         out = input
         out = out.view(input.shape[0], -1)  # flatten
         for layer in self.net:
@@ -138,35 +164,125 @@ class BiGAN(Model):
             output_dim=img_dim,
             n_layers=self.n_layers,
             hidden_size=self.hidden_size
-        )
+        ).to(ptu.GetDevice())
 
-        self.critic = BiGANDiscriminator(
+        self.discriminator = BiGANDiscriminator(
             input_dim=img_dim,
             z_dim=self.latent_dim,
             output_dim=1,
             n_layers=self.n_layers,
             hidden_size=self.hidden_size
-        )
+        ).to(ptu.GetDevice())
 
-        # self.encoder = BiGANEncoder(
-        #     input_dim=img_dim,
-        #     output_dim=self.latent_dim,
-        #     n_layers=self.n_layers,
-        #     hidden_size=self.hidden_size
-        # )
+        self.encoder = BiGANEncoder(
+            input_dim=img_dim,
+            output_dim=self.latent_dim,
+            n_layers=self.n_layers,
+            hidden_size=self.hidden_size
+        ).to(ptu.GetDevice())
 
         # linear classifier
-        self.linear_classifier = nn.Linear(img_dim, self.n_classes)
+        self.classifier = nn.Linear(img_dim, self.n_classes)
         #self.linear_optimizer = optim.Adam(self.linear_classifier.parameters(), lr=1e-3)
 
-    def critic_loss(self, input):
+    def discriminator_loss(self, input):
         B, *_ = input.shape
+        criterion = nn.BCEWithLogitsLoss()
+
         fake_data, z_fake_data = self.generator.sample(B)
         fake_data = fake_data.reshape(B, -1)
+
         z_real = self.encoder.forward(input).reshape(B, self.latent_dim)
         x_real = input.reshape(B, -1)
-        c_loss = 0.5 * (self.critic.forward(x_real, z_real)).log().mean() - 0.5 * (1.0 - self.critic.forard(fake_data, z_fake_data)).log().mean()
-        return c_loss
 
+        disc_fake_pred = self.discriminator.forward(fake_data.detach(), z_fake_data)
+        disc_real_pred = self.discriminator.forward(x_real, z_real.detach())
 
+        # d_loss = 0.5 * (self.discriminator.forward(x_real, z_real)).log().mean()
+        # d_loss += 0.5 * (1.0 - self.discriminator.forward(fake_data, z_fake_data)).log().mean()
+        d_loss = criterion(disc_real_pred, torch.ones_like(disc_real_pred))
+        d_loss += criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
+        d_loss /= 2.0
+        d_loss = d_loss.mean()
 
+        return d_loss
+
+    def generator_loss(self, input):
+        # B, *_ = input.shape
+        # criterion = nn.BCEWithLogitsLoss()
+        # fake_data, z_fake_data = self.generator.sample(B)
+        # fake_data = fake_data.reshape(B, -1) # flatten
+        #
+        # #g_loss = self.discriminator.forward(fake_data).log().mean()
+        # disc_fake_pred = self.discriminator.forward(fake_data, z_fake_data)
+        # g_loss = criterion(disc_fake_pred, torch.ones_like(disc_fake_pred)).mean()
+        #
+        # return g_loss
+        B, *_ = input.shape
+        criterion = nn.BCEWithLogitsLoss()
+
+        fake_data, z_fake_data = self.generator.sample(B)
+        fake_data = fake_data.reshape(B, -1)
+
+        z_real = self.encoder.forward(input).reshape(B, self.latent_dim)
+        x_real = input.reshape(B, -1)
+
+        disc_fake_pred = self.discriminator.forward(fake_data, z_fake_data)
+        disc_real_pred = self.discriminator.forward(x_real, z_real)
+
+        # d_loss = 0.5 * (self.discriminator.forward(x_real, z_real)).log().mean()
+        # d_loss += 0.5 * (1.0 - self.discriminator.forward(fake_data, z_fake_data)).log().mean()
+        d_loss = criterion(disc_real_pred, torch.ones_like(disc_real_pred))
+        d_loss += criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
+        d_loss /= -2.0
+        d_loss = d_loss.mean()
+
+        return d_loss
+
+    def SetupGANOptimizers(self, solver):
+        self.generator_optimizer = optim.Adam(
+            list(self.generator.parameters()) + list(self.encoder.parameters()),
+            lr=solver.lr, betas=(0.5, 0.999), eps=solver.eps, weight_decay=2.5e-5
+        )
+
+        self.discriminator_optimizer = optim.Adam(
+            self.discriminator.parameters(),
+            lr=solver.lr, betas=(0.5, 0.999), eps=solver.eps
+            #lr=2e-4, betas=(0, 0.9), eps=solver.eps
+        )
+
+        self.classifier_optimizer = optim.Adam(
+            self.classifier.parameters(),
+            #lr=solver.lr, betas=solver.betas, eps=solver.eps
+            lr=1e-3, betas=solver.betas, eps=solver.eps
+        )
+
+    def SetupGANSchedulers(self, solver):
+        self.generator_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.generator_optimizer,
+            lambda epoch: (solver.epochs - epoch) / solver.epochs,
+            last_epoch=-1
+        )
+
+        self.discriminator_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.discriminator_optimizer,
+            lambda epoch: (solver.epochs - epoch) / solver.epochs,
+            last_epoch=-1
+        )
+
+    def ResetClassifier(self):
+        C, H, W = self.input_shape
+        img_dim = C * H * W
+        self.classifier = nn.Linear(img_dim, self.n_classes)
+        self.classifier_optimizer = optim.Adam(self.classifier.parameters(), lr=1e-3)
+
+    def sample(self, n_samples=1000):
+        self.generator.eval()
+        self.discriminator.eval()
+        self.encoder.eval()
+
+        with torch.no_grad():
+            samples, z = self.generator.sample(n_samples)
+            samples = (samples.reshape(-1, 28, 28, 1)) * 0.5 + 0.5
+
+        return samples

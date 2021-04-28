@@ -27,6 +27,7 @@ class frame():
         self.strFramesetName = ""
         self.fJITLoading = fJITLoading
         self.fVerbose = fVerbose
+        self._shape = None
 
         # Load from from folder on disk
         if(strFrameID != None):
@@ -176,31 +177,36 @@ class frame():
             channelImage.whiten(fZCA=fZCA)
 
     def shape(self, strName=None):
-        height, width, channels = 0, 0, 0
-        if(strName != None):
-            return self.channels[strName].shape()
-        else:
-            for strChannelName, channelImage in self.channels.items():
-                H, W, C = channelImage.shape()
+        if(self._shape == None):
+            height, width, channels = 0, 0, 0
+            if(strName != None):
+                return self.channels[strName].shape()
+            else:
+                for strChannelName, channelImage in self.channels.items():
+                    H, W, C = channelImage.shape()
+                    #print(channelImage.shape())
 
-                if(height == 0):
-                    height = H
-                elif(H != height):
-                    raise Exception("Height %d of %s doesn't match height %d of frame" % (H, strChannelName, height))
+                    if(height == 0):
+                        height = H
+                    elif(H != height):
+                        raise Exception("Height %d of %s doesn't match height %d of frame" % (H, strChannelName, height))
 
-                if (width == 0):
-                    width = W
-                elif (W != width):
-                    raise Exception("Width %d of %s doesn't match width %d of frame" % (W, strChannelName, width))
+                    if (width == 0):
+                        width = W
+                    elif (W != width):
+                        raise Exception("Width %d of %s doesn't match width %d of frame" % (W, strChannelName, width))
 
-                channels += C
+                    channels += C
 
-            return (height, width, channels)
+                self._shape = (height, width, channels)
+
+        return self._shape
 
     # Unload image from memory
     def Unload(self):
         if (self.fVerbose):
-            print("unloading frame %s" % self.load_state)
+            #print("unloading frame %s" % self.load_state)
+            print("unloading frame %s" % self.strFrameID)
 
         for strName, channelImage in self.channels.items():
             channelImage.UnloadImage()

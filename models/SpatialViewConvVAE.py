@@ -7,6 +7,8 @@ from repos.pyjunk.junktools.image import image
 
 import math
 
+import repos.pyjunk.junktools.pytorch_utils  as ptu
+
 # Convolutional VAE model with a spatial decoder that also takes in the view to broadcast
 
 # Not really different than the normal ConvVAE encoder, but just for namespace
@@ -16,29 +18,76 @@ class SpatialViewConvEncoder(nn.Module):
         self.input_shape = input_shape
         self.latent_dim = latent_dim
         self.latent_dim_sqrt = int(math.sqrt(latent_dim))
+        self.hidden_spatial_extents = 8  # note: square only
+        self.first_depth = 8  # 32
+        self.ConstructModel()
 
+    def ConstructModel(self):
         # input shape is h, w, c
-        H, W, C = input_shape
+        H, W, C = self.input_shape
 
         print(C)
 
+        # # Construct the net
+        # self.net = [
+        #     nn.Conv2d(C, 32, 3, 1, 1),
+        #     nn.ReLU(),
+        #     nn.Conv2d(32, 64, 3, 2, 1),  # 16 x 16
+        #     nn.ReLU(),
+        #     nn.Conv2d(64, 128, 3, 2, 1),  # 8 x 8
+        #     nn.ReLU(),
+        #     nn.Conv2d(128, 256, 3, 2, 1),  # 4 x 4
+        #     nn.ReLU(),
+        #     nn.Flatten(),
+        #     nn.Linear(
+        #         #4 * 4 * 256,
+        #         8 * 8 * 256,
+        #         2 * self.latent_dim
+        #     ),
+        # ]
+
         # Construct the net
-        self.net = [
-            nn.Conv2d(C, 32, 3, 1, 1),
+        self.net = []
+        current_spatial_dim = H
+        current_depth_dim = C
+        next_depth_dim = self.first_depth
+        idx = 0
+
+        self.net.extend([
+            nn.Conv2d(C, next_depth_dim, 3, 1, 1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, 3, 2, 1),  # 16 x 16
-            nn.ReLU(),
-            nn.Conv2d(64, 128, 3, 2, 1),  # 8 x 8
-            nn.ReLU(),
-            nn.Conv2d(128, 256, 3, 2, 1),  # 4 x 4
-            nn.ReLU(),
+        ])
+        current_depth_dim = next_depth_dim
+        next_depth_dim = next_depth_dim * 2
+
+        while (current_spatial_dim > self.hidden_spatial_extents):
+            print("spatial %d -> %d depth %d -> %d" % (
+                current_spatial_dim,
+                current_spatial_dim // 2,
+                current_depth_dim,
+                next_depth_dim
+            ))
+            self.net.extend([
+                nn.Conv2d(current_depth_dim, next_depth_dim, 3, 2, 1),
+                nn.ReLU(),
+            ])
+            current_spatial_dim = current_spatial_dim // 2
+            current_depth_dim = next_depth_dim
+            next_depth_dim = next_depth_dim * 2
+
+        # Final linear layer
+        print("linear %d -> %d" % (
+            current_spatial_dim * current_depth_dim,
+            2 * self.latent_dim
+        ))
+        self.net.extend([
             nn.Flatten(),
             nn.Linear(
-                #4 * 4 * 256,
-                8 * 8 * 256,
-                2 * self.latent_dim
+                # 4 * 4 * 256,
+                (current_spatial_dim ** 2) * current_depth_dim,
+                2 * self.latent_dim  # mean and std-dev so need two bruv
             ),
-        ]
+        ])
 
         self.net = nn.ModuleList([*self.net])
 
@@ -111,19 +160,21 @@ class SpatialViewConvDecoder(nn.Module):
         B, *_ = in_x.shape
         out = in_x
 
+        H, W, C = self.output_shape
+
         # first FC layer
         #out = self.fc_layer(out)
 
         # broadcast latent dimensions up to 64 x 64 and concatnate the positions
-        out = in_x.view(-1, self.latent_dim, 1, 1).repeat(1, 1, 64, 64)
-        width_positions = torch.linspace(-1, 1, 64)
-        height_positions = torch.linspace(-1, 1, 64)
+        out = in_x.view(-1, self.latent_dim, 1, 1).repeat(1, 1, H, W)
+        width_positions = torch.linspace(-1, 1, H)
+        height_positions = torch.linspace(-1, 1, W)
         x_pos, y_pos = torch.meshgrid(width_positions, height_positions)
-        x_pos = x_pos.unsqueeze(0).repeat(B, 1, 1, 1)
-        y_pos = y_pos.unsqueeze(0).repeat(B, 1, 1, 1)
+        x_pos = x_pos.unsqueeze(0).repeat(B, 1, 1, 1).to(ptu.GetDevice())
+        y_pos = y_pos.unsqueeze(0).repeat(B, 1, 1, 1).to(ptu.GetDevice())
 
         # broadcast the view
-        broadcast_view = in_view.view(-1, self.view_dim, 1, 1).repeat(1, 1, 64, 64)
+        broadcast_view = in_view.view(-1, self.view_dim, 1, 1).repeat(1, 1, H, W)
 
         out = torch.cat((out, x_pos, y_pos, broadcast_view), dim=1)
 
@@ -139,7 +190,6 @@ class SpatialViewConvDecoder(nn.Module):
 
 class SpatialViewConvVAE(Model):
     def __init__(self, input_shape, latent_dim, view_dim=7, num_layers=12, num_filters=128, *args, **kwargs):
-        super(SpatialViewConvVAE, self).__init__(*args, **kwargs)
 
         # input shape is h, w, c
         self.input_shape = input_shape
@@ -149,16 +199,22 @@ class SpatialViewConvVAE(Model):
         self.num_filters = num_filters
         self.num_layers = num_layers
 
+        super(SpatialViewConvVAE, self).__init__(*args, **kwargs)
+
+    def ConstructModel(self):
         # Set up the encoder and decoder
-        self.encoder = SpatialViewConvEncoder(input_shape, self.latent_dim)
+        self.encoder = SpatialViewConvEncoder(
+            self.input_shape,
+            self.latent_dim).to(ptu.GetDevice())
+
         self.decoder = SpatialViewConvDecoder(
             self.latent_dim,
-            input_shape,
+            self.input_shape,
             kernel_size=3,
             view_dim=self.view_dim,
             num_filters=self.num_filters,
             num_layers=self.num_layers
-        )
+        ).to(ptu.GetDevice())
 
     def loss(self, in_x, in_view):
         input = in_x.permute(0, 3, 1, 2)
@@ -170,6 +226,7 @@ class SpatialViewConvVAE(Model):
         # run the net
         mu_z, log_std_dev_z = self.encoder.forward(out)
         z = torch.randn_like(mu_z) * log_std_dev_z.exp() + mu_z
+        z = z.to(ptu.GetDevice())
         x_tilda = self.decoder.forward(z, in_view)
 
         # Reconstruction loss is just MSE
@@ -188,7 +245,7 @@ class SpatialViewConvVAE(Model):
         images = []
 
         with torch.no_grad():
-            z = torch.randn(n_samples, self.latent_dim)
+            z = torch.randn(n_samples, self.latent_dim).to(ptu.GetDevice())
             samples = torch.clamp(self.decoder.forward(z), -1.0, 1.0)
 
         #samples = x.cpu().permute(0, 2, 3, 1).numpy() * 0.5 + 0.5
@@ -203,8 +260,8 @@ class SpatialViewConvVAE(Model):
     def generate_with_view(self, in_view):
 
         with torch.no_grad():
-            z = torch.randn(1, self.latent_dim)
-            torchViewBuffer = in_view.GetViewPitchYawTorchTensor().unsqueeze(0)
+            z = torch.randn(1, self.latent_dim).to(ptu.GetDevice())
+            torchViewBuffer = in_view.GetViewPitchYawTorchTensor().unsqueeze(0).to(ptu.GetDevice())
             sample = torch.clamp(self.decoder.forward(z, torchViewBuffer), -1.0, 1.0)
 
         sample = sample.squeeze().permute(1, 2, 0) * 0.5 + 0.5
@@ -232,10 +289,10 @@ class SpatialViewConvVAE(Model):
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
-        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
 
         # Retrieve frame view
-        torchQueryViewBuffer = frameObject.GetFrameCameraView().unsqueeze(0)
+        torchQueryViewBuffer = frameObject.GetFrameCameraView().unsqueeze(0).to(ptu.GetDevice())
 
         # Run the model
         torchLoss = self.loss(in_x=torchImageBuffer, in_view=torchQueryViewBuffer)
