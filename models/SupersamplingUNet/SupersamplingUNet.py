@@ -9,6 +9,8 @@ from repos.pyjunk.models.ConvUNet import ConvUNet
 
 from repos.pyjunk.models.modules.VGGLoss import VGGLoss
 
+import repos.pyjunk.junktools.pytorch_utils as ptu
+
 import math
 import kornia
 
@@ -46,55 +48,67 @@ class SSFeatExtract(nn.Module):
         return out
 
 class SupersamplingUNet(Model):
-    def __init__(self, input_shape, output_shape, scale=3, num_filters=32, *args, **kwargs):
-        super(SupersamplingUNet, self).__init__(*args, **kwargs)
+    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=3, num_filters=32, *args, **kwargs):
 
         # input shape is h, w, c
-        self.input_shape = input_shape
+        self.input_rgb_shape = input_rgb_shape
+        self.input_depth_shape = input_depth_shape
         self.output_shape = output_shape
         self.scale = scale
         self.num_filters = num_filters
         self.out_features = 8
+        self.num_feat_filters = 32
 
-        in_H, in_W, in_C = input_shape
-        out_H, out_W, out_C = output_shape
+        super(SupersamplingUNet, self).__init__(*args, **kwargs)
 
-        self.scale_factor = out_H // in_H
+    def ConstructModel(self):
+        in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+
+        out_H, out_W, out_C = self.output_shape
+
+        self.scale_factor = out_H // in_rgb_H
+
+        feat_extract_input_shape = (in_rgb_H, in_rgb_W, in_rgb_C + in_depth_C)
+        print(feat_extract_input_shape)
 
         # Feature Extraction Network
         self.feat_extract = SSFeatExtract(
-            input_shape=input_shape,
-            num_filters=32,
+            input_shape=feat_extract_input_shape,
+            num_filters=self.num_feat_filters,
             out_features=self.out_features
-        )
+        ).to(ptu.GetDevice())
 
         # upsampling (TODO: Zero upsampling implementation)
         self.upsampling = nn.Upsample(
             #size=self.output_shape,
             scale_factor=self.scale_factor,
             mode='nearest'
-        )
+        ).to(ptu.GetDevice())
 
         # Set up the U-Net
         self.unet = ConvUNet(
-            input_shape=(out_H, out_W, in_C + self.out_features),
+            input_shape=(out_H, out_W, in_rgb_C + in_depth_C + self.out_features),
             output_shape=(out_H, out_W, out_C),
             scale=3,
             num_filters=32
-        )
+        ).to(ptu.GetDevice())
 
-        self.vgg_loss = VGGLoss(requires_grad=False)
+        self.vgg_loss = VGGLoss(
+            requires_grad=False
+        ).to(ptu.GetDevice())
 
     def forward(self, input):
         ycbcr = kornia.color.RgbToYcbcr()
         rgb = kornia.color.YcbcrToRgb()
 
-        input = input.permute(0, 3, 1, 2)
-
-        # shift into [-1, 1]
-        out = input
-        out = ycbcr(out)
-        out = (out * 2.0) - 1.0
+        input_rgb = input[:, :, :, 0:3]
+        input_depth = input[:, :, :, 3].unsqueeze(dim=3)
+        input_depth = input_depth.permute(0, 3, 1, 2)
+        input_rgb = input_rgb.permute(0, 3, 1, 2)
+        input_ycbcr = ycbcr(input_rgb)
+        out = torch.cat([input_ycbcr, input_depth], dim=1)
+        out = (out * 2.0) - 1.0 # shift into [-1, 1]
 
         # Feature extract
         #print(out.shape)
@@ -125,16 +139,29 @@ class SupersamplingUNet(Model):
         rgb = kornia.color.YcbcrToRgb()
 
         B, C, H, W = target_x.shape
-        in_x = in_x.permute(0, 3, 1, 2)
-        in_x_ycbcr = ycbcr(in_x)
 
+        # in_x = in_x.permute(0, 3, 1, 2)
+        # in_x_ycbcr = ycbcr(in_x)
+        #
 
+        input_rgb = in_x[:, :, :, 0:3]
+        input_depth = in_x[:, :, :, 3].unsqueeze(dim=3)
+        input_depth = input_depth.permute(0, 3, 1, 2)
+        input_rgb = input_rgb.permute(0, 3, 1, 2)
+        input_ycbcr = ycbcr(input_rgb)
+
+        #print(target_x.shape)
+        # TODO: not sure why we need this, but sometimes we get a non 3 channel input
+        if(target_x.shape[3] > 3):
+            target_x = target_x[:, :, :, 0:3]
         target_x_rgb = target_x.permute(0, 3, 1, 2)
         target_x_ycbcr = ycbcr(target_x_rgb)
 
         # shift to [-1, 1]
-        out = in_x_ycbcr
-        out = (out * 2.0) - 1.0
+        # out = in_x_ycbcr
+        # out = (out * 2.0) - 1.0
+        out = torch.cat([input_ycbcr, input_depth], dim=1)
+        out = (out * 2.0) - 1.0  # shift into [-1, 1]
 
         # Feature extract
         out = self.feat_extract.forward(out)
@@ -171,12 +198,12 @@ class SupersamplingUNet(Model):
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
-        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npTargetFrameBuffer = targetFrameObject.GetNumpyBuffer()
         torchTargetImageBuffer = torch.FloatTensor(npTargetFrameBuffer)
-        torchTargetImageBuffer = torchTargetImageBuffer.unsqueeze(0)
+        torchTargetImageBuffer = torchTargetImageBuffer.unsqueeze(0).to(ptu.GetDevice())
 
         # Run the model
         torchLoss = self.loss(
@@ -191,7 +218,7 @@ class SupersamplingUNet(Model):
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
-        torchImageBuffer = torchImageBuffer.unsqueeze(0)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
 
         # Run the model (squeeze, permute and shift)
         torchOutput = self.forward(torchImageBuffer)

@@ -8,6 +8,7 @@ import random
 import numpy as np
 
 from repos.pyjunk.junktools import utils
+from tqdm import trange, tqdm_notebook
 
 from repos.pyjunk.solvers.TorchSolver import TorchSolver
 
@@ -25,12 +26,16 @@ class ConvUNetTorchSolver(TorchSolver):
         idx = [*range(train_frameset.num_frames)]
         random.shuffle(idx)
         idx = idx[:self.batch_size]
-        print("training on frames %s in frameset %s" % (idx, train_frameset.strFramesetName))
+        #print("training on frames %s in frameset %s" % (idx, train_frameset.strFramesetName))
 
         frames = [train_frameset[i] for i in idx]
         target_frames = [train_target_frameset[i] for i in idx]
 
-        for frame, cond_frame in zip(frames, target_frames):
+        pbar = tqdm_notebook(zip(frames, target_frames), desc='training on frame', leave=False, total=len(frames))
+
+        for frame, cond_frame in pbar:
+            strDesc = f'training on frame {frame.strFrameID}'
+            pbar.set_description(strDesc)
             loss = self.model.loss_with_frame(frame, cond_frame)
 
             self.optimizer.zero_grad()
@@ -51,7 +56,7 @@ class ConvUNetTorchSolver(TorchSolver):
         idx = [*range(test_frameset.num_frames)]
         random.shuffle(idx)
         idx = idx[:self.test_batch_size]
-        print("testing on frames %s in frameset %s" % (idx, test_frameset.strFramesetName))
+        #print("testing on frames %s in frameset %s" % (idx, test_frameset.strFramesetName))
 
         frames = [test_frameset[i] for i in idx]
         target_frames = [test_target_frameset[i] for i in idx]
@@ -59,7 +64,10 @@ class ConvUNetTorchSolver(TorchSolver):
         with torch.no_grad():
             #loss += self.model.loss_with_frameset_and_target(test_source_frameset, test_target_frameset)
 
-            for frame, cond_frame in zip(frames, target_frames):
+            pbar = tqdm_notebook(zip(frames, target_frames), desc='testing on frame', leave=False, total=len(frames))
+            for frame, cond_frame in pbar:
+                strDesc = f'testing on frame {frame.strFrameID}'
+                pbar.set_description(strDesc)
                 loss += self.model.loss_with_frame(frame, cond_frame)
 
             loss /= self.test_batch_size
@@ -80,7 +88,9 @@ class ConvUNetTorchSolver(TorchSolver):
         training_losses = []
         test_losses = []
 
-        for epoch in range(self.epochs):
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+
+        for epoch in pbar:
             train_losses = self.train_frameset(
                 train_frameset=train_frameset, train_target_frameset=train_target_frameset
             )
@@ -90,7 +100,8 @@ class ConvUNetTorchSolver(TorchSolver):
             test_losses.append(test_loss)
 
             if(fVerbose):
-                print(f'Epoch {epoch}, Test loss {test_loss:.4f}')
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                pbar.set_description(strDesc)
 
             if(self.checkpoint_file_name != None and epoch % self.checkpoint_epochs == 0 and epoch != 0):
                 print("Saving checkpoint to %s at epoch %s and loss %s" % (self.checkpoint_file_name, epoch, test_loss))

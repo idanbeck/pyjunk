@@ -198,16 +198,16 @@ class ConvUNetDecoder(nn.Module):
 
 class ConvUNet(Model):
     def __init__(self, input_shape, output_shape, scale=3, num_filters=32, channels=3, *args, **kwargs):
-        super(ConvUNet, self).__init__(*args, **kwargs)
-
         # input shape is h, w, c
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.scale = scale
         self.num_filters = num_filters
         self.channels = channels
+        super(ConvUNet, self).__init__(*args, **kwargs)
 
-        H, W, C = input_shape
+    def ConstructModel(self):
+        H, W, C = self.input_shape
 
         self.ssim_loss = SSIMModule(
             window_size=11,
