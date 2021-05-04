@@ -58,6 +58,8 @@ class SupersamplingUNet(Model):
         self.num_filters = num_filters
         self.out_features = 8
         self.num_feat_filters = 32
+        self.fAugmentNoise = True
+        self.lambda_augment = 0.001
 
         super(SupersamplingUNet, self).__init__(*args, **kwargs)
 
@@ -97,6 +99,17 @@ class SupersamplingUNet(Model):
         self.vgg_loss = VGGLoss(
             requires_grad=False
         ).to(ptu.GetDevice())
+
+        if(self.fAugmentNoise == True):
+            self.input_noise = torch.distributions.normal.Normal(
+                torch.zeros(feat_extract_input_shape),
+                torch.ones(feat_extract_input_shape)
+            )
+
+            self.output_noise = torch.distributions.normal.Normal(
+                torch.zeros(self.output_shape),
+                torch.ones(self.output_shape)
+            )
 
     def forward(self, input):
         ycbcr = kornia.color.RgbToYcbcr()
@@ -143,7 +156,7 @@ class SupersamplingUNet(Model):
         # in_x = in_x.permute(0, 3, 1, 2)
         # in_x_ycbcr = ycbcr(in_x)
         #
-
+        
         input_rgb = in_x[:, :, :, 0:3]
         input_depth = in_x[:, :, :, 3].unsqueeze(dim=3)
         input_depth = input_depth.permute(0, 3, 1, 2)
@@ -154,6 +167,13 @@ class SupersamplingUNet(Model):
         # TODO: not sure why we need this, but sometimes we get a non 3 channel input
         if(target_x.shape[3] > 3):
             target_x = target_x[:, :, :, 0:3]
+
+        if (self.fAugmentNoise and torch.rand(1) > 0.5):
+            # input_noise = self.input_noise.sample([B])
+            # print(input_noise.shape)
+            # in_x += self.lambda_augment * self.input_noise.sample([in_x.shape[0]]).to(ptu.GetDevice())
+            target_x += self.lambda_augment * self.output_noise.sample([target_x.shape[0]]).to(ptu.GetDevice())
+
         target_x_rgb = target_x.permute(0, 3, 1, 2)
         target_x_ycbcr = ycbcr(target_x_rgb)
 
