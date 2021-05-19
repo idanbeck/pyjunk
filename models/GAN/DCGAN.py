@@ -96,7 +96,10 @@ class DCGANDiscriminator(nn.Module):
         #out = torch.cat((z, input), dim=1)
         # out = out.view(input.shape[0], -1)  # flatten
 
-        out = input.squeeze().unsqueeze(dim=1)
+        if(len(input.shape) > 3):
+            out = input
+        else:
+            out = input.squeeze().unsqueeze(dim=1)
 
         for layer in self.net:
             out = layer(out)
@@ -145,7 +148,10 @@ class DCGAN(Model):
         B, *_ = input.shape
         criterion = nn.BCEWithLogitsLoss()
         fake_data, z_fake_data = self.generator.sample(B)
-        x_real = input
+        if(len(input.shape) > 3):
+            x_real = input.permute(0, 3, 1, 2)
+        else:
+            x_real = input
 
         disc_fake_pred = self.discriminator.forward(fake_data.detach())
         disc_real_pred = self.discriminator.forward(x_real)

@@ -185,6 +185,8 @@ class SpatialConvVAE(Model):
             kernel_size=3).to(ptu.GetDevice())
 
     def loss(self, input):
+        H, W, C = self.input_shape
+        input = input[:, :, :, :C]          # Drop 4th channel, seems to be sneaking in sometimes?
         input = input.permute(0, 3, 1, 2)
 
         # shift into [-1, 1]

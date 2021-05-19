@@ -68,6 +68,74 @@ class SGANTorchSolver():
 
         return epoch
 
+    def train_gan_epochs_frameset(self, train_frameset, fVerbose=False):
+        training_losses = []
+        self.current_iteration = 0
+        g_loss = 0
+
+        pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
+        for epoch in pbar:
+            self.model.generator.train()
+            self.model.discriminator.train()
+            self.batch_loss_history = []
+
+            idx = [*range(train_frameset.num_frames)]
+            random.shuffle(idx)
+            idx = idx[:self.test_batch_size]
+
+            frames = [train_frameset[i] for i in idx]
+
+            pbar_inner = tqdm_notebook(frames, desc='testing on frame', leave=False)
+
+            for frame in pbar_inner:
+                self.current_iteration += 1
+                strDesc = f'Training on frame {frame.strFrameID}'
+                pbar.set_description_str(strDesc)
+
+                # Get the frame
+                npFrameBuffer = frame.GetNumpyBuffer()
+                torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+                torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
+                torchImageBuffer = torchImageBuffer[:, :, :, :3]    # bit of a hack tho
+
+                x = torchImageBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+                B, *_ = x.shape
+                #print(x.shape)
+
+                # critic update
+                self.model.discriminator_optimizer.zero_grad()
+                d_loss = self.model.discriminator_loss(x)
+                d_loss.backward(retain_graph=True)
+                self.model.discriminator_optimizer.step()
+
+                # Generator
+                if (self.current_iteration % self.n_critic == 0):
+                    self.model.generator_optimizer.zero_grad()
+                    # g_loss = -self.model.discriminator_loss(x)
+                    g_loss = self.model.generator_loss(x)
+                    g_loss.backward()
+                    # torch.autograd.set_detect_anomaly(True)
+                    self.model.generator_optimizer.step()
+
+                # TODO: both discriminator and generator loss
+                self.batch_loss_history.append(d_loss.item())
+                strDesc = f'D {d_loss.item():.4f} G {g_loss:.4f} iter {self.current_iteration}'
+                pbar_inner.set_description(strDesc)
+
+            self.model.generator_scheduler.step()
+            self.model.discriminator_scheduler.step()
+            avg_epoch_loss = np.mean(self.batch_loss_history)
+            training_losses.append(avg_epoch_loss)
+            strDesc = f'D loss {avg_epoch_loss:.4f} iter {self.current_iteration}'
+            pbar.set_description(strDesc)
+
+            if (epoch % self.checkpoint_epochs == 0):
+                self.SaveCheckpoint(self.checkpoint_file_name, epoch)
+
+        training_losses = np.array(training_losses)
+        return training_losses
+
+
     def train_gan_epochs(self, train_data, fVerbose=False):
         training_losses = []
         validation_losses = []

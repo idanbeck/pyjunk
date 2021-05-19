@@ -44,7 +44,13 @@ class image_transform_square(image_transform):
         if (self.fVerbose == True):
             print("squaring image state: %s channel: %s id: %s frameset: %s" % (inImage.load_state, inImage.strChannelName, inImage.strFrameID, inImage.strFramesetName))
 
-        width, height, channels = inImage.shape()
+        if (len(inImage.shape()) == 3):
+            width, height, channels = inImage.shape()
+        else:
+            width, height = inImage.shape()
+            channels = 1
+
+        #width, height, channels = inImage.shape()
         dim = self.get_dim(width, height, self.max_size)
 
         inImage.npImageBuffer = resize(
@@ -70,7 +76,13 @@ class image_transform_whiten(image_transform):
         if (self.fVerbose == True):
             print("whitening image state: %s channel: %s id: %s frameset: %s" % (inImage.load_state, inImage.strChannelName, inImage.strFrameID, inImage.strFramesetName))
 
-        width, height, channels = inImage.shape()
+        if (len(inImage.shape()) == 3):
+            width, height, channels = inImage.shape()
+        else:
+            width, height = inImage.shape()
+            channels = 1
+
+        # width, height, channels = inImage.shape()
 
         # First get into correct set up (w, h last dims)
         X = inImage.npImageBuffer
