@@ -173,7 +173,7 @@ class SRGAN_Discriminator(nn.Module):
             nn.Flatten()  # sigmoid can be added in loss fn
         ])
 
-        self.net = nn.ModlueList([*self.net])
+        self.net = nn.ModuleList([*self.net])
 
     def forward(self, input):
         out = input
@@ -185,6 +185,8 @@ class SRGAN_Discriminator(nn.Module):
 class SRGAN(Model):
     def __init__(self, input_shape, *args, **kwargs):
         self.input_shape = input_shape
+        self.lambda_gen_adv = 0.001
+        self.lambda_gen_vgg = 0.006
         super(SRGAN, self).__init__(*args, **kwargs)
 
     def ConstructModel(self):
@@ -206,5 +208,76 @@ class SRGAN(Model):
             requires_grad=False
         ).to(ptu.GetDevice())
 
+    def discriminator_loss(self, hr_real, lr_real):
+        B, *_ = hr_real.shape
+        #criterion = nn.BCEWithLogitsLoss()
 
+        hr_fake = self.generator.forward(lr_real)
 
+        fake_preds_for_d = self.discriminator(hr_fake.detatch())
+        real_preds_for_d = self.discriminator(hr_real.detatch())
+
+        d_loss = F.binary_cross_entropy_with_logits(real_preds_for_d, torch.ones_like(real_preds_for_d))
+        d_loss += F.binary_cross_entropy_with_logits(fake_preds_for_d. torch.zeros_like(fake_preds_for_d))
+        d_loss *= 0.5
+        d_loss = d_loss.mean()
+
+        return d_loss
+
+    def generator_loss(self, hr_real, lr_real):
+        B, *_ = hr_real.shape
+        # criterion = nn.BCEWithLogitsLoss()
+
+        hr_fake = self.generator.forward(lr_real)
+        fake_preds_for_g = self.discriminator(hr_fake)
+
+        # adversarial loss
+        g_loss = self.lambda_gen_adv * F.binary_cross_entropy_with_logits(fake_preds_for_g, torch.ones_like(fake_preds_for_g))
+
+        # content loss
+        # return F.mse_loss(self.vgg(x_real), self.vgg(x_fake))
+        g_loss += self.lambda_gen_vgg * self.vgg_loss.loss(hr_real, hr_fake)
+
+        # img mse loss
+        g_loss += F.mse_loss(hr_real, hr_fake)
+
+        return g_loss
+
+    def SetupGANOptimizers(self, solver):
+        self.generator_optimizer = optim.Adam(
+            self.generator.parameters(),
+            lr=solver.lr, betas=solver.betas, eps=solver.eps
+        )
+
+        self.discriminator_optimizer = optim.Adam(
+            self.discriminator.parameters(),
+            #lr=2e-4, betas=(0, 0.9), eps=solver.eps, weight_decay=2.5e-5
+            lr=solver.lr, betas=solver.betas, eps=solver.eps
+        )
+
+    def SetupGANSchedulers(self, solver):
+        self.generator_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.generator_optimizer,
+            lambda epoch: (solver.epochs - epoch) / solver.epochs,
+            last_epoch=-1
+        )
+
+        self.discriminator_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.discriminator_optimizer,
+            lambda epoch: (solver.epochs - epoch) / solver.epochs,
+            last_epoch=-1
+        )
+
+    def forward_with_frame(self, frameObject):
+        # Grab the torch tensor from the frame (this may be a particularly deep tensor)
+        npFrameBuffer = frameObject.GetNumpyBuffer()
+        torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+        torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
+
+        # Run the model (squeeze, permute and shift)
+        torchOutput = self.generator.forward(torchImageBuffer)
+        # torchOutput = torchOutput.squeeze().permute(1, 2, 0) * 0.5 + 0.5
+        torchOutput = torchOutput.squeeze().permute(1, 2, 0)
+
+        # return an image
+        return image(torchBuffer=torchOutput)
