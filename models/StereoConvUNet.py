@@ -119,7 +119,7 @@ class StereoConvUNetDecoder(nn.Module):
         self.net.extend(*[first_module])
 
         for k in reversed(range(2, self.scale)):
-            in_c = self.num_filters * (2 ** k) * 2 # times two because of the stereo skip connections
+            in_c = self.num_filters * ((2 ** k) + 2) # times two because of the stereo skip connections
             inner_c = self.num_filters * (2 ** (k - 1))
             out_c = self.num_filters * (2 ** (k - 2))
             print("dec inner: %d - %d - %d" % (in_c, inner_c, out_c))
@@ -135,7 +135,7 @@ class StereoConvUNetDecoder(nn.Module):
             self.net.extend(*[next_module])
 
         # Last module
-        in_c = self.num_filters * 2
+        in_c = self.num_filters * (2 + 1)
         inner_c = self.num_filters
         out_c = C
         print("dec final: %d - %d - %d" % (in_c, inner_c, out_c))
@@ -162,11 +162,14 @@ class StereoConvUNetDecoder(nn.Module):
         skip_id = len(skip_connections_left) - 1
         fFirst = True
 
-        for layer in self.net:
-            if(fFirst == True):
-                fFirst = False
-                out = torch.cat((in_left, in_right), dim=1)
+        #print(in_left.shape)
+        #print(in_right.shape)
 
+        out = torch.cat((in_left, in_right), dim=1)
+
+        for layer in self.net:
+            #print("yo")
+            #print(out.shape)
             out = layer(out)
 
             # If we just ran an upsample then plop in the skipperoonie
@@ -176,7 +179,7 @@ class StereoConvUNetDecoder(nn.Module):
 
         return out
 
-class ConvUNet(Model):
+class StereoConvUNet(Model):
     def __init__(self, input_shape, output_shape, scale=3, num_filters=32, channels=3, *args, **kwargs):
         # input shape is h, w, c
         self.input_shape = input_shape
@@ -184,7 +187,7 @@ class ConvUNet(Model):
         self.scale = scale
         self.num_filters = num_filters
         self.channels = channels
-        super(ConvUNet, self).__init__(*args, **kwargs)
+        super(StereoConvUNet, self).__init__(*args, **kwargs)
 
     def ConstructModel(self):
         H, W, C = self.input_shape
@@ -201,6 +204,12 @@ class ConvUNet(Model):
 
         # Set up the encoder and decoder
         self.left_encoder = StereoConvUNetEncoder(
+            input_shape=self.input_shape,
+            scale=self.scale,
+            num_filters=self.num_filters
+        ).to(ptu.GetDevice())
+
+        self.right_encoder = StereoConvUNetEncoder(
             input_shape=self.input_shape,
             scale=self.scale,
             num_filters=self.num_filters
@@ -227,8 +236,8 @@ class ConvUNet(Model):
         in_right_ycbcr = (in_right_ycbcr * 2.0) - 1.0
 
         # encode
-        enc_out_left, skip_connections_left = self.encoder.forward(in_left_ycbcr)
-        enc_out_right, skip_connections_right = self.encoder.forward(in_right_ycbcr)
+        enc_out_left, skip_connections_left = self.left_encoder.forward(in_left_ycbcr)
+        enc_out_right, skip_connections_right = self.right_encoder.forward(in_right_ycbcr)
 
         # decode
         out = self.decoder.forward(enc_out_left, enc_out_right, skip_connections_left, skip_connections_right)
@@ -255,8 +264,8 @@ class ConvUNet(Model):
 
         # encode
         #print(out.shape)
-        enc_out_left, skip_connections_left = self.encoder.forward(in_left_ycbcr)
-        enc_out_right, skip_connections_right = self.encoder.forward(in_right_ycbcr)
+        enc_out_left, skip_connections_left = self.left_encoder.forward(in_left_ycbcr)
+        enc_out_right, skip_connections_right = self.right_encoder.forward(in_right_ycbcr)
 
         # decode
         #print(out.shape)
@@ -278,15 +287,18 @@ class ConvUNet(Model):
         npFrameLeftBuffer = frameLeftObject.GetNumpyBuffer()
         torchImageLeftBuffer = torch.FloatTensor(npFrameLeftBuffer)
         torchImageLeftBuffer = torchImageLeftBuffer.unsqueeze(0)
+        torchImageLeftBuffer = torchImageLeftBuffer[:, :, :, :3]  # bit of a hack tho
 
         npFrameRightBuffer = frameRightObject.GetNumpyBuffer()
         torchImageRightBuffer = torch.FloatTensor(npFrameRightBuffer)
         torchImageRightBuffer = torchImageRightBuffer.unsqueeze(0)
+        torchImageRightBuffer = torchImageRightBuffer[:, :, :, :3]  # bit of a hack tho
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npTargetFrameBuffer = targetFrameObject.GetNumpyBuffer()
         torchTargetImageBuffer = torch.FloatTensor(npTargetFrameBuffer)
         torchTargetImageBuffer = torchTargetImageBuffer.unsqueeze(0)
+        torchTargetImageBuffer = torchTargetImageBuffer[:, :, :, :3]  # bit of a hack tho
 
         # Run the model
         torchLoss = self.loss(
@@ -301,10 +313,12 @@ class ConvUNet(Model):
         npFrameLeftBuffer = frameLeftObject.GetNumpyBuffer()
         torchImageLeftBuffer = torch.FloatTensor(npFrameLeftBuffer)
         torchImageLeftBuffer = torchImageLeftBuffer.unsqueeze(0)
+        torchImageLeftBuffer = torchImageLeftBuffer[:, :, :, :3]  # bit of a hack tho
 
         npFrameRightBuffer = frameRightObject.GetNumpyBuffer()
         torchImageRightBuffer = torch.FloatTensor(npFrameRightBuffer)
         torchImageRightBuffer = torchImageRightBuffer.unsqueeze(0)
+        torchImageRightBuffer = torchImageRightBuffer[:, :, :, :3]  # bit of a hack tho
 
         # Run the model (squeeze, permute and shift)
         torchOutput = self.forward(torchImageLeftBuffer, torchImageRightBuffer)
