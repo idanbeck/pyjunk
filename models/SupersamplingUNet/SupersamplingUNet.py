@@ -219,11 +219,13 @@ class SupersamplingUNet(Model):
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
         torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
+        torchImageBuffer = torchImageBuffer[:, :, :, :4]  # bit of a hack tho
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npTargetFrameBuffer = targetFrameObject.GetNumpyBuffer()
         torchTargetImageBuffer = torch.FloatTensor(npTargetFrameBuffer)
         torchTargetImageBuffer = torchTargetImageBuffer.unsqueeze(0).to(ptu.GetDevice())
+        torchTargetImageBuffer = torchTargetImageBuffer[:, :, :, :3]  # bit of a hack tho
 
         # Run the model
         torchLoss = self.loss(
@@ -239,6 +241,7 @@ class SupersamplingUNet(Model):
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
         torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
+        torchImageBuffer = torchImageBuffer[:, :, :, :4]  # bit of a hack tho
 
         # Run the model (squeeze, permute and shift)
         torchOutput = self.forward(torchImageBuffer)

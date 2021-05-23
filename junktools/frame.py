@@ -145,15 +145,15 @@ class frame():
                     fVerbose = self.fVerbose
                 )
 
-    def visualize(self, strTitle=None):
+    def visualize(self, strTitle=None, fInvert=False):
         for strName, channelImage in self.channels.items():
             if(self.strFrameID != None):
                 strName = strName + ": " + self.strFrameID
 
             if (strTitle != None):
-                channelImage.visualize(strTitle=strTitle + ': ' + strName)
+                channelImage.visualize(strTitle=strTitle + ': ' + strName, fInvert=fInvert)
             else:
-                channelImage.visualize(strTitle=strName)
+                channelImage.visualize(strTitle=strName, fInvert=fInvert)
 
     def clear_transforms(self):
         for strName, channelImage in self.channels.items():

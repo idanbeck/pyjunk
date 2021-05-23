@@ -178,7 +178,7 @@ class image():
         def channels(self):
             return self.npImageBuffer.shape[2]
 
-        def visualize(self, strTitle=None):
+        def visualize(self, strTitle=None, fInvert=False):
             #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(0, 3, 1, 2)
             #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(2, 0, 1)
 
@@ -190,6 +190,9 @@ class image():
                 raise BufferError
 
             vals = (torch.FloatTensor(npImageBuffer)).permute(2, 0, 1)
+            if(fInvert == True):
+                vals = 1.0 - vals
+
             grid_image = make_grid(vals, nrow=1)
             plt.figure()
             plt.title(strTitle)
@@ -225,6 +228,9 @@ class image():
                 square_transform.process_transform(inImage=self)
             else:
                 self.transforms.append(square_transform)
+
+        # def set_alpha_(self):
+        #     inverse_transform =
 
         # Normalizes per the mean and std-dev of the image
         # Utilizes zero component analysis
