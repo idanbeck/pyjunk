@@ -80,7 +80,7 @@ class SRGANTorchSolver(SGANTorchSolver):
                 try:
                     npFrameLRBuffer = frame_lr.GetNumpyBuffer()
                 except Exception as e:
-                    print(f'failed to load frame {frame_lr.strFrameID}, skipping')
+                    print(f'failed to load lr frame {frame_lr.strFrameID}, skipping')
                     continue
 
                 torchImageLRBuffer = torch.FloatTensor(npFrameLRBuffer)
@@ -97,7 +97,11 @@ class SRGANTorchSolver(SGANTorchSolver):
                 #print(x_lr.shape)
 
                 # Get the low res frame
-                npFrameHRBuffer = frame_hr.GetNumpyBuffer()
+                try:
+                    npFrameHRBuffer = frame_hr.GetNumpyBuffer()
+                except Exception as e:
+                    print(f'failed to load hr frame {frame_hr.strFrameID}, skipping')
+                    continue
                 torchImageHRBuffer = torch.FloatTensor(npFrameHRBuffer)
                 torchImageHRBuffer = torchImageHRBuffer.unsqueeze(0).to(ptu.GetDevice())
                 torchImageHRBuffer = torchImageHRBuffer[:, :, :, :3]  # bit of a hack tho
