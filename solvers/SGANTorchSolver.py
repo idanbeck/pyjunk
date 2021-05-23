@@ -93,7 +93,12 @@ class SGANTorchSolver():
                 pbar.set_description_str(strDesc)
 
                 # Get the frame
-                npFrameBuffer = frame.GetNumpyBuffer()
+                try:
+                    npFrameBuffer = frame.GetNumpyBuffer()
+                except Exception as e:
+                    print(f'failed to load frame {frame.strFrameID}, skipping')
+                    continue
+
                 torchImageBuffer = torch.FloatTensor(npFrameBuffer)
                 torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
                 torchImageBuffer = torchImageBuffer[:, :, :, :3]    # bit of a hack tho

@@ -37,7 +37,12 @@ class ConvVAETorchSolver(TorchSolver):
         for frame in pbar:
             strDesc = f'training on frame {frame.strFrameID}'
             pbar.set_description(strDesc)
-            loss = self.model.loss_with_frame(frame)
+
+            try:
+                loss = self.model.loss_with_frame(frame)
+            except Exception as e:
+                print(f'failed to load frame {frame.strFrameID}, skipping')
+                continue
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -70,7 +75,11 @@ class ConvVAETorchSolver(TorchSolver):
             for frame in pbar:
                 strDesc = f'testing on frame {frame.strFrameID}'
                 pbar.set_description(strDesc)
-                loss += self.model.loss_with_frame(frame)
+                try:
+                    loss += self.model.loss_with_frame(frame)
+                except Exception as e:
+                    print(f'failed to load frame {frame.strFrameID}, skipping')
+                    continue
 
             loss /= self.test_batch_size
 

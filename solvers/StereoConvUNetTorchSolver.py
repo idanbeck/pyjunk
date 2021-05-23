@@ -37,7 +37,11 @@ class StereoConvUNetTorchSolver(TorchSolver):
         for frame_left, frame_right, target_frame in pbar:
             strDesc = f'training on frame {frame_left.strFrameID}'
             pbar.set_description(strDesc)
-            loss = self.model.loss_with_frame(frame_left, frame_right, target_frame)
+            try:
+                loss = self.model.loss_with_frame(frame_left, frame_right, target_frame)
+            except Exception as e:
+                print(f'failed to load frame {frame_left.strFrameID}, skipping')
+                continue
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -70,7 +74,11 @@ class StereoConvUNetTorchSolver(TorchSolver):
             for frame_left, frame_right, target_frame in pbar:
                 strDesc = f'testing on frame {frame_left.strFrameID}'
                 pbar.set_description(strDesc)
-                loss += self.model.loss_with_frame(frame_left, frame_right, target_frame)
+                try:
+                    loss += self.model.loss_with_frame(frame_left, frame_right, target_frame)
+                except Exception as e:
+                    print(f'failed to load frame {frame_left.strFrameID}, skipping')
+                    continue
 
             loss /= self.test_batch_size
 

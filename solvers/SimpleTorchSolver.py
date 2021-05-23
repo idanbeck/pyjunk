@@ -40,7 +40,12 @@ class SimpleTorchSolver(TorchSolver):
 
         sourceFrames, targetFrames = zip(*train_data)
         for sourceFrame, targetFrame in zip(sourceFrames, targetFrames):
-            loss = self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
+
+            try:
+                loss = self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
+            except Exception as e:
+                print(f'failed to load frame {sourceFrame.strFrameID}, skipping')
+                continue
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -69,7 +74,11 @@ class SimpleTorchSolver(TorchSolver):
 
         for sourceFrame, targetFrame in zip(sourceFrames, targetFrames):
             #loss = self.model.loss_with_frameset_and_target(train_source_frameset, train_target_frameset)
-            loss = self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
+            try:
+                loss = self.model.loss_with_frame_and_target(sourceFrame, targetFrame)
+            except Exception as e:
+                print(f'failed to load frame {sourceFrame.strFrameID}, skipping')
+                continue
 
             self.optimizer.zero_grad()
             loss.backward()
