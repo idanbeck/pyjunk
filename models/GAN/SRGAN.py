@@ -234,7 +234,7 @@ class SRGAN(Model):
         # img mse loss
         g_loss += F.mse_loss(hr_real, hr_fake)
 
-        return g_loss
+        return g_loss, hr_fake
 
     def SetupGANOptimizers(self, solver):
         self.generator_optimizer = optim.Adam(
@@ -252,12 +252,14 @@ class SRGAN(Model):
         self.generator_scheduler = torch.optim.lr_scheduler.LambdaLR(
             self.generator_optimizer,
             lambda epoch: (solver.epochs - epoch) / solver.epochs,
+            #lambda _: 0.1,
             last_epoch=-1
         )
 
         self.discriminator_scheduler = torch.optim.lr_scheduler.LambdaLR(
             self.discriminator_optimizer,
             lambda epoch: (solver.epochs - epoch) / solver.epochs,
+            #lambda _: 0.1,
             last_epoch=-1
         )
 
@@ -272,7 +274,7 @@ class SRGAN(Model):
         # Run the model (squeeze, permute and shift)
         torchOutput = self.generator.forward(torchImageLRBuffer)
         # torchOutput = torchOutput.squeeze().permute(1, 2, 0) * 0.5 + 0.5
-        torchOutput = torchOutput.squeeze().permute(1, 2, 0)
+        torchOutput = torchOutput.squeeze().permute(1, 2, 0) #* 0.5 + 0.5
 
         # return an image
         return image(torchBuffer=torchOutput)

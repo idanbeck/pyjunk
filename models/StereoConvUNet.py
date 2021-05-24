@@ -165,7 +165,7 @@ class StereoConvUNetDecoder(nn.Module):
         #print(in_left.shape)
         #print(in_right.shape)
 
-        out = torch.cat((in_left, in_right), dim=1)
+        out = torch.cat((in_left, in_right), dim=1).to(ptu.GetDevice())
 
         for layer in self.net:
             #print("yo")
@@ -174,7 +174,7 @@ class StereoConvUNetDecoder(nn.Module):
 
             # If we just ran an upsample then plop in the skipperoonie
             if (isinstance(layer, nn.Upsample)):
-                out = torch.cat((skip_connections_left[skip_id], skip_connections_right[skip_id], out), dim=1)
+                out = torch.cat((skip_connections_left[skip_id], skip_connections_right[skip_id], out), dim=1).to(ptu.GetDevice())
                 skip_id -= 1
 
         return out
@@ -229,10 +229,10 @@ class StereoConvUNet(Model):
         in_right = in_right.permute(0, 3, 1, 2)
 
         # shift into [-1, 1]
-        in_left_ycbcr = ycbcr(in_left)
+        in_left_ycbcr = ycbcr(in_left).to(ptu.GetDevice())
         in_left_ycbcr = (in_left_ycbcr * 2.0) - 1.0
 
-        in_right_ycbcr = ycbcr(in_right)
+        in_right_ycbcr = ycbcr(in_right).to(ptu.GetDevice())
         in_right_ycbcr = (in_right_ycbcr * 2.0) - 1.0
 
         # encode
@@ -243,7 +243,7 @@ class StereoConvUNet(Model):
         out = self.decoder.forward(enc_out_left, enc_out_right, skip_connections_left, skip_connections_right)
 
         # Convert back to rgb for output
-        out_rgb= rgb(out * 0.5 + 0.5)
+        out_rgb= rgb(out * 0.5 + 0.5).to(ptu.GetDevice())
 
         return out_rgb
 
@@ -252,15 +252,15 @@ class StereoConvUNet(Model):
         rgb = kornia.color.YcbcrToRgb()
 
         in_left = in_left.permute(0, 3, 1, 2)
-        in_left_ycbcr = ycbcr(in_left)
+        in_left_ycbcr = ycbcr(in_left).to(ptu.GetDevice())
         in_left_ycbcr = (in_left_ycbcr * 2.0) - 1.0         # shift to [-1, 1]
 
         in_right = in_right.permute(0, 3, 1, 2)
-        in_right_ycbcr = ycbcr(in_right)
+        in_right_ycbcr = ycbcr(in_right).to(ptu.GetDevice())
         in_right_ycbcr = (in_right_ycbcr * 2.0) - 1.0       # shift to [-1, 1]
 
         target_x_rgb = target_x.permute(0, 3, 1, 2)
-        target_x_ycbcr = ycbcr(target_x_rgb)
+        target_x_ycbcr = ycbcr(target_x_rgb).to(ptu.GetDevice())
 
         # encode
         #print(out.shape)
@@ -276,7 +276,7 @@ class StereoConvUNet(Model):
 
         #print(out.shape)
         #loss = 0.5 * (1.0 - self.ssim_loss.forward(out, target_x))
-        loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
+        loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11)).to(ptu.GetDevice())
         #loss = loss.mean(1).mean(1).mean(1)
         loss = loss.mean()
 

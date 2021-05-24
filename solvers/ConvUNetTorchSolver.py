@@ -17,6 +17,9 @@ from repos.pyjunk.solvers.TorchSolver import TorchSolver
 class ConvUNetTorchSolver(TorchSolver):
     def __init__(self, model, params, *args, **kwargs):
         super(ConvUNetTorchSolver, self).__init__(model=model, params=params, *args, *kwargs)
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, 
+                                                           lambda epoch: (self.epochs - epoch) / self.epochs,
+                                                           last_epoch=-1)
 
     def train_frameset(self, train_frameset, train_target_frameset):
         self.model.train()
@@ -31,25 +34,41 @@ class ConvUNetTorchSolver(TorchSolver):
         frames = [train_frameset[i] for i in idx]
         target_frames = [train_target_frameset[i] for i in idx]
 
-        pbar = tqdm_notebook(zip(frames, target_frames), desc='training on frame', leave=False, total=len(frames))
+        # pbar = tqdm_notebook(zip(frames, target_frames), desc='training on frame', leave=False, total=len(frames))
+        # for frame, cond_frame in pbar:
+        #     strDesc = f'training on frame {frame.strFrameID}'
+        #     pbar.set_description(strDesc)
+        #     try:
+        #         loss = self.model.loss_with_frame(frame, cond_frame)
+        #     except Exception as e:
+        #         print(f'failed to load frame {frame.strFrameID}, skipping...')
+        #         continue
+        #
+        #     self.optimizer.zero_grad()
+        #     loss.backward()
+        #
+        #     if(self.grad_clip):
+        #         nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
+        #
+        #     self.optimizer.step()
+        #     training_losses.append(loss.item())
+        #loss = self.model.loss_with_frames(frames, target_frames)
+        try:
+            loss = self.model.loss_with_frames(frames, target_frames)
+        except Exception as e:
+            print(f'epoch failed, skipping...')
+            return [0]
 
-        for frame, cond_frame in pbar:
-            strDesc = f'training on frame {frame.strFrameID}'
-            pbar.set_description(strDesc)
-            try:
-                loss = self.model.loss_with_frame(frame, cond_frame)
-            except Exception as e:
-                print(f'failed to load frame {frame.strFrameID}, skipping...')
-                continue
+        self.optimizer.zero_grad()
+        loss.backward()
 
-            self.optimizer.zero_grad()
-            loss.backward()
+        if(self.grad_clip):
+            nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
 
-            if(self.grad_clip):
-                nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
-
-            self.optimizer.step()
-            training_losses.append(loss.item())
+        self.optimizer.step()
+        self.scheduler.step()
+        
+        training_losses.append(loss.item())
 
         return training_losses
 
@@ -86,8 +105,10 @@ class ConvUNetTorchSolver(TorchSolver):
         if(self.save_test_file_name != None):
             frameid = random.randint(0, len(frames) - 1)
             testImg = self.model.forward_with_frame(frames[frameid])
-
-        return loss.item(), testImg
+        if(loss == 0.0):
+            return 0.0, testImg
+        else:
+            return loss.item(), testImg
 
     def train_for_epochs_frameset(self,
                                   train_frameset, train_target_frameset,
