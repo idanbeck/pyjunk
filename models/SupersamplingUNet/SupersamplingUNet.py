@@ -11,8 +11,11 @@ from repos.pyjunk.models.modules.VGGLoss import VGGLoss
 
 import repos.pyjunk.junktools.pytorch_utils as ptu
 
+from tqdm import trange, tqdm_notebook
+
 import math
 import kornia
+
 
 class SSFeatExtract(nn.Module):
     def __init__(self, input_shape, num_filters=32, out_features=8, *args, **kwargs):
@@ -47,8 +50,11 @@ class SSFeatExtract(nn.Module):
 
         return out
 
+
 class SupersamplingUNet(Model):
-    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=3, num_filters=32, *args, **kwargs):
+    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=3, num_filters=32,
+                 ssim_window_size=11, lambda_vgg=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
+                 upsample_mode='nearest', fZeroSampling=True, fLearnedMask=False, *args, **kwargs):
 
         # input shape is h, w, c
         self.input_rgb_shape = input_rgb_shape
@@ -59,7 +65,13 @@ class SupersamplingUNet(Model):
         self.out_features = 8
         self.num_feat_filters = 32
         self.fAugmentNoise = True
-        self.lambda_augment = 0.001
+        self.lambda_augment = lambda_augment
+        self.ssim_window_size = ssim_window_size
+        self.lambda_vgg = lambda_vgg
+        self.prob_aug_noise = prob_aug_noise
+        self.upsample_mode = upsample_mode
+        self.fZeroSampling = fZeroSampling
+        self.fLearnedMask = fLearnedMask
 
         super(SupersamplingUNet, self).__init__(*args, **kwargs)
 
@@ -83,10 +95,30 @@ class SupersamplingUNet(Model):
 
         # upsampling (TODO: Zero upsampling implementation)
         self.upsampling = nn.Upsample(
-            #size=self.output_shape,
+            # size=self.output_shape,
             scale_factor=self.scale_factor,
-            mode='nearest'
+            mode=self.upsample_mode
         ).to(ptu.GetDevice())
+
+        if(self.fZeroSampling):
+            #self.zero_upsampling_mask = torch.autograd.Variable(ptu.zeros(1, 1, out_H, out_W), requires_grad=True)
+            #self.zero_upsampling_mask = nn.Parameter(ptu.zeros(1, 1, out_H, out_W), requires_grad=True)
+            if(self.fLearnedMask):
+                self.zero_upsampling_mask = nn.Parameter(ptu.zeros(1, 1, out_H, out_W), requires_grad=True)
+                #nn.init.sparse_(self.zero_upsampling_mask.data, sparsity=0.1)
+                nn.init.xavier_normal_(self.zero_upsampling_mask.data)
+            else:
+                self.zero_upsampling_mask = nn.Parameter(ptu.zeros(1, 1, out_H, out_W), requires_grad=False)
+               
+                #self.zero_upsampling_mask = ptu.zeros(1, 1, out_H, out_W)
+                for i in range(in_rgb_H):
+                    for j in range(in_rgb_H):
+                        self.zero_upsampling_mask.data[:, :,
+                        #self.zero_upsampling_mask[:, :,
+                            i * self.scale_factor + self.scale_factor // 2,
+                            j * self.scale_factor + self.scale_factor // 2] = 1
+                # print(self.zero_upsampling_mask.shape)
+                # print(self.zero_upsampling_mask[0, 0, 0, 0:100])
 
         # Set up the U-Net
         self.unet = ConvUNet(
@@ -100,7 +132,7 @@ class SupersamplingUNet(Model):
             requires_grad=False
         ).to(ptu.GetDevice())
 
-        if(self.fAugmentNoise == True):
+        if (self.fAugmentNoise == True):
             self.input_noise = torch.distributions.normal.Normal(
                 torch.zeros(feat_extract_input_shape),
                 torch.ones(feat_extract_input_shape)
@@ -121,30 +153,33 @@ class SupersamplingUNet(Model):
         input_rgb = input_rgb.permute(0, 3, 1, 2)
         input_ycbcr = ycbcr(input_rgb)
         out = torch.cat([input_ycbcr, input_depth], dim=1)
-        out = (out * 2.0) - 1.0 # shift into [-1, 1]
+        out = (out * 2.0) - 1.0  # shift into [-1, 1]
 
         # Feature extract
-        #print(out.shape)
+        # print(out.shape)
         out = self.feat_extract.forward(out)
 
         # upsample
-        #print(out.shape)
+        # print(out.shape)
         out = self.upsampling(out)
+
+        if(self.fZeroSampling == True):
+            out = out * self.zero_upsampling_mask
 
         # U-net
 
         # encode
-        #print(out.shape)
+        # print(out.shape)
         out, skip = self.unet.encoder.forward(out)
 
         # decode
-        #print(out.shape)
+        # print(out.shape)
         out = self.unet.decoder(out, skip)
 
         # Convert back to rgb for output
         out = rgb(out * 0.5 + 0.5)
 
-        #print(out.shape)
+        # print(out.shape)
         return out
 
     def loss(self, in_x, target_x):
@@ -156,19 +191,19 @@ class SupersamplingUNet(Model):
         # in_x = in_x.permute(0, 3, 1, 2)
         # in_x_ycbcr = ycbcr(in_x)
         #
-        
+
         input_rgb = in_x[:, :, :, 0:3]
         input_depth = in_x[:, :, :, 3].unsqueeze(dim=3)
         input_depth = input_depth.permute(0, 3, 1, 2)
         input_rgb = input_rgb.permute(0, 3, 1, 2)
         input_ycbcr = ycbcr(input_rgb)
 
-        #print(target_x.shape)
+        # print(target_x.shape)
         # TODO: not sure why we need this, but sometimes we get a non 3 channel input
-        if(target_x.shape[3] > 3):
+        if (target_x.shape[3] > 3):
             target_x = target_x[:, :, :, 0:3]
 
-        if (self.fAugmentNoise and torch.rand(1) > 0.5):
+        if (self.fAugmentNoise and torch.rand(1) > 1.0 - self.prob_aug_noise):
             # input_noise = self.input_noise.sample([B])
             # print(input_noise.shape)
             # in_x += self.lambda_augment * self.input_noise.sample([in_x.shape[0]]).to(ptu.GetDevice())
@@ -189,6 +224,11 @@ class SupersamplingUNet(Model):
         # upsample
         out = self.upsampling(out)
 
+        if (self.fZeroSampling == True):
+            # print(out.shape)
+            # print(self.zero_upsampling_mask.shape)
+            out = out * self.zero_upsampling_mask
+
         # U-net (avoid the scaling in the other network so do this here)
 
         # encode
@@ -198,19 +238,19 @@ class SupersamplingUNet(Model):
         out = self.unet.decoder(out, skip)
         out = out * 0.5 + 0.5
 
-        #loss = 1.0 - self.unet.ssim_loss.forward(out, target_x)
-        #loss = (1.0 - self.unet.ssim_loss.forward(out, target_x)) + 0.25 * torch.norm(out - target_x, 1)*(1.0/(C * H * W))
+        # loss = 1.0 - self.unet.ssim_loss.forward(out, target_x)
+        # loss = (1.0 - self.unet.ssim_loss.forward(out, target_x)) + 0.25 * torch.norm(out - target_x, 1)*(1.0/(C * H * W))
 
-        #ssim_loss = 0.5 * (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
-        ssim_loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
+        # ssim_loss = 0.5 * (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
+        ssim_loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, self.ssim_window_size))
         ssim_loss = ssim_loss.mean(1).mean(1).mean(1)
 
         out_rgb = rgb(out)
         vgg_loss = self.vgg_loss.loss(out_rgb, target_x_rgb)
         # print(vgg_loss)
 
-        loss = ssim_loss + vgg_loss
-        #loss = ssim_loss
+        loss = ssim_loss + self.lambda_vgg * vgg_loss
+        # loss = ssim_loss
 
         return loss
 
@@ -235,6 +275,48 @@ class SupersamplingUNet(Model):
         # return an image
         return torchLoss
 
+    def loss_with_frames(self, sourceFrames, targetFrames):
+
+        pbar = tqdm_notebook(zip(sourceFrames, targetFrames), desc='loading frame', leave=False,
+                             total=len(sourceFrames))
+
+        x_lr = None
+        x_hr = None
+
+        for frame_lr, frame_hr in pbar:
+            npFrameLRBuffer = frame_lr.GetNumpyBuffer()
+            torchImageLRBuffer = torch.FloatTensor(npFrameLRBuffer)
+            torchImageLRBuffer = torchImageLRBuffer.unsqueeze(0).to(ptu.GetDevice())
+            torchImageLRBuffer = torchImageLRBuffer[:, :, :, :4]  # bit of a hack tho
+            # torchImageLRBuffer = torchImageLRBuffer.permute(0, 3, 1, 2)
+
+            x_lr_ = torchImageLRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+
+            if (x_lr == None):
+                x_lr = x_lr_
+            else:
+                x_lr = torch.cat((x_lr, x_lr_), dim=0)
+
+            npFrameHRBuffer = frame_hr.GetNumpyBuffer()
+            torchImageHRBuffer = torch.FloatTensor(npFrameHRBuffer)
+            torchImageHRBuffer = torchImageHRBuffer.unsqueeze(0).to(ptu.GetDevice())
+            torchImageHRBuffer = torchImageHRBuffer[:, :, :, :3]  # bit of a hack tho
+            # torchImageHRBuffer = torchImageHRBuffer.permute(0, 3, 1, 2)
+
+            x_hr_ = torchImageHRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+            if (x_hr == None):
+                x_hr = x_hr_
+            else:
+                x_hr = torch.cat((x_hr, x_hr_), dim=0)
+
+        # Run the model
+        torchLoss = self.loss(
+            torchImageLRBuffer, torchImageHRBuffer
+        )
+
+        # return an image
+        return torchLoss
+
     def forward_with_frame(self, frameObject):
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
@@ -245,7 +327,7 @@ class SupersamplingUNet(Model):
 
         # Run the model (squeeze, permute and shift)
         torchOutput = self.forward(torchImageBuffer)
-        #torchOutput = torchOutput.squeeze().permute(1, 2, 0) * 0.5 + 0.5
+        # torchOutput = torchOutput.squeeze().permute(1, 2, 0) * 0.5 + 0.5
         torchOutput = torchOutput.squeeze().permute(1, 2, 0)
 
         # return an image

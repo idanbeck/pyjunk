@@ -87,7 +87,11 @@ class StereoConvUNetTorchSolver(TorchSolver):
         testImg = None
         if(self.save_test_file_name != None):
             frameid = random.randint(0, len(frames_left) - 1)
-            testImg = self.model.forward_with_frame(frames_left[frameid], frames_right[frameid])
+            try:
+                testImg = self.model.forward_with_frame(frames_left[frameid], frames_right[frameid])
+            except Exception as e:
+                print(f'failed to test on frame {frames_left[frameid].strFrameID}, skipping')
+                #continue
 
         return loss.item(), testImg
 
