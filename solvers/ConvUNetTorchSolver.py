@@ -132,7 +132,8 @@ class ConvUNetTorchSolver(TorchSolver):
             test_losses.append(test_loss)
 
             if(fVerbose):
-                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f}'
+                cur_lr = self.optimizer.param_groups[0]['lr']
+                strDesc = f'Epoch {epoch}, Test loss {test_loss:.4f} lr: {cur_lr}'
                 pbar.set_description(strDesc)
 
             if(self.checkpoint_file_name != None and epoch % self.checkpoint_epochs == 0 and epoch != 0):
