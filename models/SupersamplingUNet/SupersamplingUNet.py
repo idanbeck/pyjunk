@@ -253,7 +253,8 @@ class SupersamplingUNet(Model):
         # loss = (1.0 - self.unet.ssim_loss.forward(out, target_x)) + 0.25 * torch.norm(out - target_x, 1)*(1.0/(C * H * W))
 
         # ssim_loss = 0.5 * (1.0 - kornia.losses.ssim(out, target_x_ycbcr, 11))
-        ssim_loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, self.ssim_window_size))
+        #ssim_loss = (1.0 - kornia.losses.ssim(out, target_x_ycbcr, self.ssim_window_size))
+        ssim_loss = (1.0 - kornia.losses.ssim(target_x_ycbcr, out, self.ssim_window_size))
         ssim_loss = ssim_loss.mean(1).mean(1).mean(1)
 
         out_rgb = rgb(out)
