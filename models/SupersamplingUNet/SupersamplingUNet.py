@@ -54,7 +54,8 @@ class SSFeatExtract(nn.Module):
 class SupersamplingUNet(Model):
     def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=3, num_filters=32,
                  ssim_window_size=11, lambda_vgg=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
-                 upsample_mode='nearest', fZeroSampling=True, fLearnedMask=False, *args, **kwargs):
+                 upsample_mode='nearest', fZeroSampling=True, fLearnedMask=False, fAugmentNoise=True,
+                 *args, **kwargs):
 
         # input shape is h, w, c
         self.input_rgb_shape = input_rgb_shape
@@ -64,7 +65,7 @@ class SupersamplingUNet(Model):
         self.num_filters = num_filters
         self.out_features = 8
         self.num_feat_filters = 32
-        self.fAugmentNoise = True
+        self.fAugmentNoise = fAugmentNoise
         self.lambda_augment = lambda_augment
         self.ssim_window_size = ssim_window_size
         self.lambda_vgg = lambda_vgg
