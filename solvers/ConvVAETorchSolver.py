@@ -41,7 +41,7 @@ class ConvVAETorchSolver(TorchSolver):
             try:
                 loss = self.model.loss_with_frame(frame)
             except Exception as e:
-                print(f'failed to load frame {frame.strFrameID}, skipping')
+                print(f'failed to load frame {frame.strFrameID}: {e}, skipping')
                 continue
 
             self.optimizer.zero_grad()
@@ -78,7 +78,7 @@ class ConvVAETorchSolver(TorchSolver):
                 try:
                     loss += self.model.loss_with_frame(frame)
                 except Exception as e:
-                    print(f'failed to load frame {frame.strFrameID}, skipping')
+                    print(f'failed to load frame {frame.strFrameID}: {e}, skipping')
                     continue
 
             loss /= self.test_batch_size

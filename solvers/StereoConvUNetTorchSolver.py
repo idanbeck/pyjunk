@@ -40,7 +40,7 @@ class StereoConvUNetTorchSolver(TorchSolver):
             try:
                 loss = self.model.loss_with_frame(frame_left, frame_right, target_frame)
             except Exception as e:
-                print(f'failed to load frame {frame_left.strFrameID}, skipping')
+                print(f'failed to load frame {frame_left.strFrameID}: {e}, skipping')
                 continue
 
             self.optimizer.zero_grad()
@@ -77,7 +77,7 @@ class StereoConvUNetTorchSolver(TorchSolver):
                 try:
                     loss += self.model.loss_with_frame(frame_left, frame_right, target_frame)
                 except Exception as e:
-                    print(f'failed to load frame {frame_left.strFrameID}, skipping')
+                    print(f'failed to load frame {frame_left.strFrameID}: {e}, skipping')
                     continue
 
             loss /= self.test_batch_size
@@ -90,7 +90,7 @@ class StereoConvUNetTorchSolver(TorchSolver):
             try:
                 testImg = self.model.forward_with_frame(frames_left[frameid], frames_right[frameid])
             except Exception as e:
-                print(f'failed to test on frame {frames_left[frameid].strFrameID}, skipping')
+                print(f'failed to test on frame {frames_left[frameid].strFrameID}: {e}, skipping')
                 #continue
 
         return loss.item(), testImg

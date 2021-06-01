@@ -61,7 +61,7 @@ class SRGANTorchSolver(SGANTorchSolver):
                         npFrameLRBuffer = frame_lr.GetNumpyBuffer()
                         break
                     except Exception as e:
-                        print(f'failed to load frame {frame_lr.strFrameID}, skipping')
+                        print(f'failed to load frame {frame_lr.strFrameID}: {e}, skipping')
                         newIdx = random.randint(0, frameset_lr.num_frames)
                         frame_lr = frameset_lr[newIdx]
                         frame_hr = frameset_hr[newIdx]
@@ -83,7 +83,7 @@ class SRGANTorchSolver(SGANTorchSolver):
                 try:
                     npFrameHRBuffer = frame_hr.GetNumpyBuffer()
                 except Exception as e:
-                    print(f'failed to load hr frame {frame_hr.strFrameID}, skipping')
+                    print(f'failed to load hr frame {frame_hr.strFrameID}: {e}, skipping')
                     fFail = True
                     break
                 torchImageHRBuffer = torch.FloatTensor(npFrameHRBuffer)
@@ -206,7 +206,7 @@ class SRGANTorchSolver(SGANTorchSolver):
                         npFrameLRBuffer = frame_lr.GetNumpyBuffer()
                         break
                     except Exception as e:
-                        print(f'failed to load frame {frame_lr.strFrameID}, skipping')
+                        print(f'failed to load frame {frame_lr.strFrameID}: {e}, skipping')
                         newIdx = random.randint(0, frameset_lr.num_frames)
                         frame_lr = frameset_lr[newIdx]
                         frame_hr = frameset_hr[newIdx]
@@ -228,7 +228,7 @@ class SRGANTorchSolver(SGANTorchSolver):
                 try:
                     npFrameHRBuffer = frame_hr.GetNumpyBuffer()
                 except Exception as e:
-                    print(f'failed to load hr frame {frame_hr.strFrameID}, skipping')
+                    print(f'failed to load hr frame {frame_hr.strFrameID}: {e}, skipping')
                     fFail = True
                     break
                 torchImageHRBuffer = torch.FloatTensor(npFrameHRBuffer)

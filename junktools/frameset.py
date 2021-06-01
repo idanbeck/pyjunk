@@ -261,7 +261,7 @@ class frameset():
             if(self.fJITLoading == False):
                 for f in self.frames[1:]:
                     H, W, C = f.shape()
-                    print(f.shape())
+                    #print(f.shape())
 
                     if (height == 0):
                         height = H

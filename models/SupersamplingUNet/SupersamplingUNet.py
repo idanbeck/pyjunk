@@ -147,8 +147,13 @@ class SupersamplingUNet(Model):
         ycbcr = kornia.color.RgbToYcbcr()
         rgb = kornia.color.YcbcrToRgb()
 
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+
         input_rgb = input[:, :, :, 0:3]
-        input_depth = input[:, :, :, 3].unsqueeze(dim=3)
+        if(in_depth_C == 1):
+            input_depth = input[:, :, :, 3].unsqueeze(dim=3)
+        else:
+            input_depth = input[:, :, :, 3:(3+in_depth_C)]
         input_depth = input_depth.permute(0, 3, 1, 2)
         input_rgb = input_rgb.permute(0, 3, 1, 2)
         input_ycbcr = ycbcr(input_rgb)
@@ -187,13 +192,18 @@ class SupersamplingUNet(Model):
         rgb = kornia.color.YcbcrToRgb()
 
         B, C, H, W = target_x.shape
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
 
         # in_x = in_x.permute(0, 3, 1, 2)
         # in_x_ycbcr = ycbcr(in_x)
         #
 
         input_rgb = in_x[:, :, :, 0:3]
-        input_depth = in_x[:, :, :, 3].unsqueeze(dim=3)
+        #input_depth = in_x[:, :, :, 3].unsqueeze(dim=3)
+        if (in_depth_C == 1):
+            input_depth = in_x[:, :, :, 3].unsqueeze(dim=3)
+        else:
+            input_depth = in_x[:, :, :, 3:(3 + in_depth_C)]
         input_depth = input_depth.permute(0, 3, 1, 2)
         input_rgb = input_rgb.permute(0, 3, 1, 2)
         input_ycbcr = ycbcr(input_rgb)
@@ -255,11 +265,14 @@ class SupersamplingUNet(Model):
         return loss
 
     def loss_with_frame(self, frameObject, targetFrameObject):
+        in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
         torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
-        torchImageBuffer = torchImageBuffer[:, :, :, :4]  # bit of a hack tho
+        torchImageBuffer = torchImageBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npTargetFrameBuffer = targetFrameObject.GetNumpyBuffer()
@@ -276,6 +289,8 @@ class SupersamplingUNet(Model):
         return torchLoss
 
     def loss_with_frames(self, sourceFrames, targetFrames):
+        in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
 
         pbar = tqdm_notebook(zip(sourceFrames, targetFrames), desc='loading frame', leave=False,
                              total=len(sourceFrames))
@@ -287,7 +302,7 @@ class SupersamplingUNet(Model):
             npFrameLRBuffer = frame_lr.GetNumpyBuffer()
             torchImageLRBuffer = torch.FloatTensor(npFrameLRBuffer)
             torchImageLRBuffer = torchImageLRBuffer.unsqueeze(0).to(ptu.GetDevice())
-            torchImageLRBuffer = torchImageLRBuffer[:, :, :, :4]  # bit of a hack tho
+            torchImageBuffer = torchImageLRBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
             # torchImageLRBuffer = torchImageLRBuffer.permute(0, 3, 1, 2)
 
             x_lr_ = torchImageLRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
@@ -318,12 +333,14 @@ class SupersamplingUNet(Model):
         return torchLoss
 
     def forward_with_frame(self, frameObject):
+        in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
         torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
-        torchImageBuffer = torchImageBuffer[:, :, :, :4]  # bit of a hack tho
+        torchImageBuffer = torchImageBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
 
         # Run the model (squeeze, permute and shift)
         torchOutput = self.forward(torchImageBuffer)

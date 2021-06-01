@@ -115,6 +115,8 @@ class image():
             if (channels > 3):
                 # print("removing alpha channel")
                 self.npImageBuffer = self.npImageBuffer[:, :, 0:3]
+                self._shape = self.npImageBuffer.shape
+
             elif(channels == 1):
                 self.npImageBuffer = np.expand_dims(self.npImageBuffer, axis=2)
 

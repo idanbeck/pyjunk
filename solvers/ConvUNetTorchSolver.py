@@ -56,7 +56,7 @@ class ConvUNetTorchSolver(TorchSolver):
         try:
             loss = self.model.loss_with_frames(frames, target_frames)
         except Exception as e:
-            print(f'epoch failed, skipping...')
+            print(f'epoch failed: {e}, skipping...')
             return [0]
 
         self.optimizer.zero_grad()
@@ -94,7 +94,7 @@ class ConvUNetTorchSolver(TorchSolver):
                 try:
                     loss += self.model.loss_with_frame(frame, cond_frame)
                 except Exception as e:
-                    print(f'failed to load frame {frame.strFrameID}, skipping')
+                    print(f'failed to load frame {frame.strFrameID}: {e}, skipping')
                     continue
 
             loss /= self.test_batch_size
