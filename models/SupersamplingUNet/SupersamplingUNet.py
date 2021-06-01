@@ -315,7 +315,7 @@ class SupersamplingUNet(Model):
             npFrameLRBuffer = frame_lr.GetNumpyBuffer()
             torchImageLRBuffer = torch.FloatTensor(npFrameLRBuffer)
             torchImageLRBuffer = torchImageLRBuffer.unsqueeze(0).to(ptu.GetDevice())
-            torchImageBuffer = torchImageLRBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
+            torchImageLRBuffer = torchImageLRBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
             # torchImageLRBuffer = torchImageLRBuffer.permute(0, 3, 1, 2)
 
             x_lr_ = torchImageLRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
