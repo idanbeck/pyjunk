@@ -268,6 +268,12 @@ class SupersamplingUNet(Model):
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
 
+        # This is for sure a hack
+        if (in_depth_C > 3):
+            in_depth_C = 3
+        if (in_rgb_C > 3):
+            in_rgb_C = 3
+
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
@@ -291,6 +297,12 @@ class SupersamplingUNet(Model):
     def loss_with_frames(self, sourceFrames, targetFrames):
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+
+        # This is for sure a hack
+        if (in_depth_C > 3):
+            in_depth_C = 3
+        if (in_rgb_C > 3):
+            in_rgb_C = 3
 
         pbar = tqdm_notebook(zip(sourceFrames, targetFrames), desc='loading frame', leave=False,
                              total=len(sourceFrames))
@@ -335,6 +347,12 @@ class SupersamplingUNet(Model):
     def forward_with_frame(self, frameObject):
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+
+        # This is for sure a hack
+        if (in_depth_C > 3):
+            in_depth_C = 3
+        if (in_rgb_C > 3):
+            in_rgb_C = 3
 
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
         npFrameBuffer = frameObject.GetNumpyBuffer()
