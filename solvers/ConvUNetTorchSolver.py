@@ -15,8 +15,9 @@ from repos.pyjunk.solvers.TorchSolver import TorchSolver
 # ConvVAE Solver class
 
 class ConvUNetTorchSolver(TorchSolver):
-    def __init__(self, model, params, *args, **kwargs):
+    def __init__(self, model, params, fEnableScheduler=False, *args, **kwargs):
         super(ConvUNetTorchSolver, self).__init__(model=model, params=params, *args, *kwargs)
+        self.fEnableScheduler = fEnableScheduler
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, 
                                                            lambda epoch: (self.epochs - epoch) / self.epochs,
                                                            last_epoch=-1)
@@ -66,7 +67,9 @@ class ConvUNetTorchSolver(TorchSolver):
             nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
 
         self.optimizer.step()
-        self.scheduler.step()
+        
+        if(self.fEnableScheduler):
+            self.scheduler.step()
         
         training_losses.append(loss.item())
 
