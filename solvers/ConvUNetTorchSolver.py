@@ -157,8 +157,8 @@ class ConvUNetTorchSolver(TorchSolver):
                     strSaveFileNameSource = self.save_test_file_name + '_src.png'
                     strSaveFileNameTarget = self.save_test_file_name + '_target.png'
 
-                    testImgSource.SaveToFile(self.strSaveFileNameTarget)
-                    testImgTarget.SaveToFile(self.strSaveFileNameTarget)
+                    testImgSource.SaveToFile(strSaveFileNameSource)
+                    testImgTarget.SaveToFile(strSaveFileNameTarget)
 
 
         return training_losses, test_losses
