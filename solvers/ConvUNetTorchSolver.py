@@ -112,7 +112,7 @@ class ConvUNetTorchSolver(TorchSolver):
 
             npFrameBuffer = frames[frameid].GetNumpyBuffer()
             torchImageBuffer = torch.FloatTensor(npFrameBuffer)
-            torchImageBuffer = torchImageBuffer.squeeze()
+            torchImageBuffer = torchImageBuffer.squeeze().permute(1, 2, 0)
             testImgSource = image(torchBuffer=torchImageBuffer)
 
             testImgTarget = self.model.forward_with_frame(frames[frameid])
