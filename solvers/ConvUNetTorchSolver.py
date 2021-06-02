@@ -104,14 +104,16 @@ class ConvUNetTorchSolver(TorchSolver):
 
         #loss /= len(test_data)
 
-        testImg = None
+        testImgSource = None
+        testImgTarget = None
         if(self.save_test_file_name != None):
             frameid = random.randint(0, len(frames) - 1)
-            testImg = self.model.forward_with_frame(frames[frameid])
+            testImgSource = frames[frameid]
+            testImgTarget = self.model.forward_with_frame(frames[frameid])
         if(loss == 0.0):
-            return 0.0, testImg
+            return 0.0, testImgSource, testImgTarget
         else:
-            return loss.item(), testImg
+            return loss.item(), testImgSource, testImgTarget
 
     def train_for_epochs_frameset(self,
                                   train_frameset, train_target_frameset,
@@ -128,7 +130,7 @@ class ConvUNetTorchSolver(TorchSolver):
             )
             training_losses.extend(train_losses)
 
-            test_loss, testImg = self.test_frameset(test_frameset, test_target_frameset)
+            test_loss, testImgSource, testImgTarget = self.test_frameset(test_frameset, test_target_frameset)
             test_losses.append(test_loss)
 
             if(fVerbose):
@@ -145,8 +147,12 @@ class ConvUNetTorchSolver(TorchSolver):
                     loss=test_loss
                 )
 
-                if(self.save_test_file_name != None and testImg != None):
-                    testImg.SaveToFile(self.save_test_file_name)
+                if(self.save_test_file_name != None and testImgSource != None and testImgTarget != None):
+                    strSaveFileNameSource = self.save_test_file_name + '_src.png'
+                    strSaveFileNameTarget = self.save_test_file_name + '_target.png'
+
+                    testImgSource.SaveToFile(self.strSaveFileNameTarget)
+                    testImgTarget.SaveToFile(self.strSaveFileNameTarget)
 
 
         return training_losses, test_losses
