@@ -109,7 +109,12 @@ class ConvUNetTorchSolver(TorchSolver):
         testImgTarget = None
         if(self.save_test_file_name != None):
             frameid = random.randint(0, len(frames) - 1)
-            testImgSource = image(npImageBuffer=frames[frameid].GetNumpyBuffer())
+
+            npFrameBuffer = frames[frameid].GetNumpyBuffer()
+            torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            torchImageBuffer = torchImageBuffer.squeeze()
+            testImgSource = image(npImageBuffer=torchImageBuffer)
+            
             testImgTarget = self.model.forward_with_frame(frames[frameid])
         if(loss == 0.0):
             return 0.0, testImgSource, testImgTarget
