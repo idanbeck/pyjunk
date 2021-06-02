@@ -76,7 +76,7 @@ class ConvUNetTorchSolver(TorchSolver):
 
         return training_losses
 
-    def test_frameset(self, test_frameset, test_target_frameset):
+    def test_frameset(self, test_frameset, test_target_frameset, epoch=0):
         self.model.eval()
         loss = 0.0
 
@@ -107,19 +107,27 @@ class ConvUNetTorchSolver(TorchSolver):
 
         testImgSource = None
         testImgTarget = None
-        if(self.save_test_file_name != None):
+        testImgOutput = None
+        if(self.save_test_file_name != None and epoch % self.checkpoint_epochs == 0):
             frameid = random.randint(0, len(frames) - 1)
 
             npFrameBuffer = frames[frameid].GetNumpyBuffer()
             torchImageBuffer = torch.FloatTensor(npFrameBuffer)
-            torchImageBuffer = torchImageBuffer.squeeze().permute(1, 2, 0)
+            torchImageBuffer = torchImageBuffer.squeeze()[:, :, :3] #.permute(1, 2, 0)
+            #print(torchImageBuffer.shape)
             testImgSource = image(torchBuffer=torchImageBuffer)
+            
+            npFrameBuffer = target_frames[frameid].GetNumpyBuffer()
+            torchImageBuffer = torch.FloatTensor(npFrameBuffer)
+            torchImageBuffer = torchImageBuffer.squeeze()[:, :, :3] #.permute(1, 2, 0)
+            #print(torchImageBuffer.shape)
+            testImgTarget = image(torchBuffer=torchImageBuffer)
 
-            testImgTarget = self.model.forward_with_frame(frames[frameid])
+            testImgOutput = self.model.forward_with_frame(frames[frameid])
         if(loss == 0.0):
-            return 0.0, testImgSource, testImgTarget
+            return 0.0, testImgSource, testImgTarget, testImgOutput
         else:
-            return loss.item(), testImgSource, testImgTarget
+            return loss.item(), testImgSource, testImgTarget, testImgOutput
 
     def train_for_epochs_frameset(self,
                                   train_frameset, train_target_frameset,
@@ -136,7 +144,11 @@ class ConvUNetTorchSolver(TorchSolver):
             )
             training_losses.extend(train_losses)
 
-            test_loss, testImgSource, testImgTarget = self.test_frameset(test_frameset, test_target_frameset)
+            test_loss, testImgSource, testImgTarget, testImgOutput = self.test_frameset(
+                test_frameset, 
+                test_target_frameset,
+                epoch = epoch
+            )
             test_losses.append(test_loss)
 
             if(fVerbose):
@@ -153,12 +165,14 @@ class ConvUNetTorchSolver(TorchSolver):
                     loss=test_loss
                 )
 
-                if(self.save_test_file_name != None and testImgSource != None and testImgTarget != None):
+                if(self.save_test_file_name != None and testImgSource != None and testImgTarget != None and testImgOutput != None):
                     strSaveFileNameSource = self.save_test_file_name + '_src.png'
                     strSaveFileNameTarget = self.save_test_file_name + '_target.png'
+                    strSaveFileNameOutput = self.save_test_file_name + '_output.png'
 
                     testImgSource.SaveToFile(strSaveFileNameSource)
                     testImgTarget.SaveToFile(strSaveFileNameTarget)
+                    testImgOutput.SaveToFile(strSaveFileNameOutput)
 
 
         return training_losses, test_losses
