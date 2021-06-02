@@ -11,6 +11,7 @@ from repos.pyjunk.junktools import utils
 from tqdm import trange, tqdm_notebook
 
 from repos.pyjunk.solvers.TorchSolver import TorchSolver
+from repos.pyjunk.junktools.image import image
 
 # ConvVAE Solver class
 
@@ -108,7 +109,7 @@ class ConvUNetTorchSolver(TorchSolver):
         testImgTarget = None
         if(self.save_test_file_name != None):
             frameid = random.randint(0, len(frames) - 1)
-            testImgSource = frames[frameid]
+            testImgSource = image(npImageBuffer=frames[frameid].GetNumpyBuffer())
             testImgTarget = self.model.forward_with_frame(frames[frameid])
         if(loss == 0.0):
             return 0.0, testImgSource, testImgTarget

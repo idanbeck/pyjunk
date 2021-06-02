@@ -32,6 +32,7 @@ class image():
                      strFilename=None,
                      strFilepath=None,
                      torchBuffer=None,
+                     npImageBuffer=None,
                      fJITLoading=False,
                      strFrameID=None,
                      strFramesetName=None,
@@ -59,6 +60,9 @@ class image():
 
             elif(torchBuffer != None):
                 self.npImageBuffer = torchBuffer.detach().cpu().numpy()
+                self.load_state = self.states.loaded_from_buffer
+            elif(npImageBuffer != None):
+                self.npImageBuffer = npImageBuffer
                 self.load_state = self.states.loaded_from_buffer
             else:
                 raise NotImplementedError
