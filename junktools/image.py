@@ -61,7 +61,8 @@ class image():
             elif(torchBuffer != None):
                 self.npImageBuffer = torchBuffer.detach().cpu().numpy()
                 self.load_state = self.states.loaded_from_buffer
-            elif(npImageBuffer != None):
+            #elif(npImageBuffer != None):
+            elif(isinstance(self.npImageBuffer, np.ndarray)):
                 self.npImageBuffer = npImageBuffer
                 self.load_state = self.states.loaded_from_buffer
             else:
