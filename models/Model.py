@@ -10,6 +10,7 @@ class Model(nn.Module):
     def __init__(self, *args,  **kwargs):
         super(Model, self).__init__(*args, **kwargs)
         self.net = []
+        self.params_for_forward = None
         self.ConstructModel()
         self.to(ptu.GetDevice())
 

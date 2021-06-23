@@ -144,49 +144,147 @@ class SupersamplingUNet(Model):
                 torch.ones(self.output_shape)
             )
 
-    def forward(self, input):
+    def yCbCr2rgb(self, input_im):
+        B, C, H, W = input_im.shape
+
+        input_im = input_im.permute(0, 2, 3, 1)
+        input_shape = input_im.shape
+
+        #im_flat = input_im.contiguous().view(-1, 3).float()
+        im_flat = input_im.view(-1, 3)
+
+        mat = torch.tensor([[1.164, 1.164, 1.164],
+                            [0, -0.392, 2.017],
+                            [1.596, -0.813, 0]])
+
+        bias = torch.tensor([-16.0 / 255.0, -128.0 / 255.0, -128.0 / 255.0])
+
+        temp = (im_flat + bias).mm(mat)
+        out = temp.view(input_shape)
+
+        out = out.permute(0, 3, 1, 2)
+
+        return out
+
+    def rgb2yCbCr(self, input_im):
+        B, C, H, W = input_im.shape
+
+        input_im = input_im.permute(0, 2, 3, 1)
+        input_shape = input_im.shape
+
+        #im_flat = input_im.contiguous().view(-1, 3).float()
+        im_flat = input_im.view(-1, 3)
+        mat = torch.tensor([[0.257, -0.148, 0.439],
+                            [0.564, -0.291, -0.368],
+                            [0.098, 0.439, -0.071]])
+        bias = torch.tensor([16.0 / 255.0, 128.0 / 255.0, 128.0 / 255.0])
+
+        temp = im_flat.mm(mat) + bias
+        out = temp.view(input_shape)
+
+        out = out.permute(0, 3, 1, 2)
+
+        return out
+
+    def forward(self, in_x):
+        strType = 'rgbd'
+
+        if(self.params_for_forward != None):
+            strType = self.params_for_forward.get('type', 'rgbd')
+
+        handlers = {
+            'rgbd': lambda in_rgbd : self.forward_rgbtoycbcr(in_rgbd),
+            'ycbcrd': lambda in_ycbcrd: self.forward_onnx(in_ycbcrd),
+        }
+
+        return handlers[strType](in_x)
+
+    # Expects input in NHWC format
+    def forward_rgbtoycbcr(self, in_rgbd):
         ycbcr = kornia.color.RgbToYcbcr()
         rgb = kornia.color.YcbcrToRgb()
 
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+        in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
 
-        input_rgb = input[:, :, :, 0:3]
+        input_rgb = in_rgbd[:, :, :, 0:3]
+
         if(in_depth_C == 1):
-            input_depth = input[:, :, :, 3].unsqueeze(dim=3)
+            input_depth = in_rgbd[:, :, :, 3].unsqueeze(dim=3)
         else:
-            input_depth = input[:, :, :, 3:(3+in_depth_C)]
+            input_depth = in_rgbd[:, :, :, 3:(3+in_depth_C)]
+
         input_depth = input_depth.permute(0, 3, 1, 2)
         input_rgb = input_rgb.permute(0, 3, 1, 2)
+
+        # RGB -> YCbCr
         input_ycbcr = ycbcr(input_rgb)
-        out = torch.cat([input_ycbcr, input_depth], dim=1)
-        out = (out * 2.0) - 1.0  # shift into [-1, 1]
+
+        out_input = torch.cat([input_ycbcr, input_depth], dim=1)
+        out_input_scaled = (out_input * 2.0) - 1.0  # shift into [-1, 1]
 
         # Feature extract
-        # print(out.shape)
-        out = self.feat_extract.forward(out)
+        out_feat = self.feat_extract.forward(out_input_scaled)
 
         # upsample
-        # print(out.shape)
-        out = self.upsampling(out)
+        out_upsampled = self.upsampling(out_feat)
 
-        if(self.fZeroSampling == True):
-            out = out * self.zero_upsampling_mask
+        if (self.fZeroSampling == True):
+            out_zerosampled = out_upsampled * self.zero_upsampling_mask
 
         # U-net
 
         # encode
-        # print(out.shape)
-        out, skip = self.unet.encoder.forward(out)
+        out_unet_enc, skip = self.unet.encoder.forward(out_zerosampled)
 
         # decode
-        # print(out.shape)
-        out = self.unet.decoder(out, skip)
+        out_unet_dec = self.unet.decoder(out_unet_enc, skip)
 
         # Convert back to rgb for output
-        out = rgb(out * 0.5 + 0.5)
+        out_ycbcr = out_unet_dec * 0.5 + 0.5
+        out_rgb = rgb(out_ycbcr)
 
-        # print(out.shape)
+        # switch back to NHWC format (for onnx)
+        out_rgb_permuted = out_rgb.permute(0, 2, 3, 1)
+        out = out_rgb_permuted
+
         return out
+
+    # This path assumes the input is in ycbcrd
+    # format already and also outputs the YCbCr output
+    # This is used for the ONNX path for the Barracuda pipeline in Unity
+    # Expects input in NCHW format
+    def forward_onnx(self, in_ycbcrd):
+
+        in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+        in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+
+        input_ycbcr = in_ycbcrd[:, :3, :, :]
+        input_depth = in_ycbcrd[:, 3:(3 + in_depth_C), :, :]
+
+        out_input = torch.cat([input_ycbcr, input_depth], dim=1)
+        out_input_scaled = (out_input * 2.0) - 1.0  # shift into [-1, 1]
+
+        # Feature extract
+        out_feat = self.feat_extract.forward(out_input_scaled)
+
+        # upsample
+        out_upsampled = self.upsampling(out_feat)
+
+        if(self.fZeroSampling == True):
+           out_zerosampled = out_upsampled * self.zero_upsampling_mask
+
+        # U-net
+
+        # encode
+        out_unet_enc, skip = self.unet.encoder.forward(out_zerosampled)
+
+        # decode
+        out_unet_dec = self.unet.decoder(out_unet_enc, skip)
+
+        # Convert back to rgb for output
+        out_ycbcr = out_unet_dec * 0.5 + 0.5
+        return out_ycbcr
 
     def loss(self, in_x, target_x):
         ycbcr = kornia.color.RgbToYcbcr()
@@ -363,11 +461,13 @@ class SupersamplingUNet(Model):
         torchImageBuffer = torchImageBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
 
         # Run the model (squeeze, permute and shift)
-        torchOutput = self.forward(torchImageBuffer)
+        torchOutput_raw = self.forward(torchImageBuffer)
+
         # torchOutput = torchOutput.squeeze().permute(1, 2, 0) * 0.5 + 0.5
-        torchOutput = torchOutput.squeeze().permute(1, 2, 0)
+        #torchOutput = torchOutput.squeeze().permute(1, 2, 0)
+        torchOutput = torchOutput_raw.squeeze()
 
         # return an image
-        return image(torchBuffer=torchOutput)
+        return image(torchBuffer=torchOutput), torchOutput_raw
 
 

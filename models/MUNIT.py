@@ -63,6 +63,8 @@ class MUNITContentEncoder(nn.Module):
     def ConstructNetwork(self):
         self.net = []
         channels = self.n_channels
+
+        # input layer
         self.net.extend([
             nn.ReflectionPad2d(3),
             nn.utils.spectral_norm(
@@ -72,9 +74,87 @@ class MUNITContentEncoder(nn.Module):
             nn.ReLU(inplace=True)
         ])
 
+        # Downsampling
         for i in range(self.n_downsample):
+            self.net.extend([
+                nn.ReflectionPad2d(1),
+                nn.utils.spectral_norm(
+                    nn.Conv2d(channels, 2 * channels, kernel_size=4, stride=2),
+                ),
+                nn.InstanceNorm2d(2 * channels),
+                nn.ReLU(inplace=True),
+            ])
+            channels *= 2
 
+        # ResBlocks
+        for n in range(self.n_res_blocks):
+            self.net.append(
+                ResBlock(n_channels=channels)
+            )
 
+        self.net = nn.Sequential(*self.net)
+        self.out_channels = channels
+
+    def forward(self, in_x):
+        return self.net(in_x)
+
+    @property
+    def channels(self):
+        return self.out_channels
+
+class MUNITStyleEncoder(nn.Module):
+    def __init__(self, n_channels=64, n_downsample=4, style_dim=8, *args, **kwargs):
+        super(MUNITStyleEncoder, self).__init__(*args, **kwargs)
+        self.n_channels = n_channels
+        self.n_downsample = n_downsample
+        self.style_dim = style_dim
+        self.n_deepen_layers = 2
+        self.ConstructNetwork()
+
+    def ConstructNetwork(self):
+        self.net = []
+        channels = self.n_channels
+
+        # input layer
+        self.net.extend([
+            nn.ReflectionPad2d(3),
+            nn.utils.spectral_norm(
+                nn.Conv2d(3, channels, kernel_size=7, padding=0)
+            ),
+            nn.ReLU(inplace=True)
+        ])
+
+        # downsampling layers
+        for i in range(self.n_deepen_layers):
+            self.net.extend([
+                nn.ReflectionPad2d(1),
+                nn.utils.spectral_norm(
+                    nn.Conv2d(channels, 2 * channels, kernel_size=4, stride=2)
+                ),
+                nn.ReLU(inplace=True)
+            ])
+            channels *= 2
+
+        for i in range(self.n_downsample - self.n_deepen_layers):
+            self.net.extend([
+                nn.ReflectionPad2d(1),
+                nn.utils.spectral_norm(
+                    nn.Conv2d(channels, channels, kernel_size=4, stride=2)
+                ),
+                nn.ReLU(inplace=True)
+            ])
+
+        # global pooling and pointwise convolution to style channels
+        self.net.extend([
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(channels, self.style_dim, kernel_size=1)
+        ])
+
+        self.net = nn.Sequential(*self.net)
+        self.out_channels = channels
+
+    def forward(self, in_x):
+        return self.net(in_x)
 
 
 class MUNIT(Model):

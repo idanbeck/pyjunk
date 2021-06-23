@@ -9,6 +9,7 @@ import numpy as np
 
 from repos.pyjunk.junktools import utils
 from repos.pyjunk.solvers.Schedulers.AnnealingScheduler import AnnealingScheduler
+import repos.pyjunk.junktools.pytorch_utils as ptu
 
 # Base Solver class
 
@@ -64,7 +65,11 @@ class TorchSolver():
         }, strCheckpointFilename)
 
     def LoadCheckpoint(self, strCheckpointFilename):
-        checkpoint = torch.load(strCheckpointFilename)
+        if ptu.GetDevice() is None:
+            torch_device = torch.device('cpu')
+        else:
+            torch_device = ptu.GetDevice()
+        checkpoint = torch.load(strCheckpointFilename, map_location=torch_device)
 
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -74,5 +79,33 @@ class TorchSolver():
 
         return epoch, loss
 
+    def SaveONNXCheckpoint(self,
+                           strCheckpointFilename,
+                           sampleModelInput,
+                           opset_version=9,
+                           dynamic_axes={},
+                           input_names=['input'],
+                           output_names=['out'],
+                           example_outputs=None,
+                           params_for_forward=None
+                           ):
+
+        if(params_for_forward != None):
+            self.model.params_for_forward = params_for_forward
+
+        # Export the model
+        torch.onnx.export(self.model,                   # model being run
+                          sampleModelInput,             # model input (or a tuple for multiple inputs)
+                          strCheckpointFilename,        # where to save the model (can be a file or file-like object)
+                          export_params=True,           # store the trained parameter weights inside the model file
+                          opset_version=opset_version,              # the ONNX version to export the model to
+                          do_constant_folding=True,     # whether to execute constant folding for optimization
+                          input_names=input_names,            # the model's input names
+                          output_names=output_names,            # the model's output names
+                          verbose=True,
+                          dynamic_axes=dynamic_axes
+                          )
+
+        self.model.params_for_forward = None
 
 
