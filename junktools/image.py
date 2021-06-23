@@ -75,7 +75,7 @@ class image():
             if (self.fVerbose):
                 print("saving %s" % strFilename)
 
-            imageio.imwrite(strFilename, (npBuffer * 255.0).astype(np.uint8))
+            imageio.imwrite(strFilename, (np.clip(npBuffer, 0.0, 1.0) * 255.0).astype(np.uint8))
 
         def SaveImage(self, strFramePath, strExtension):
             strFilename = self.strChannelName + '.' + strExtension
@@ -93,7 +93,7 @@ class image():
             #imageWriter.append_data(npBuffer)
 
             #imageio.imwrite(strFramePathName, npBuffer.astype(np.uint8))
-            imageio.imwrite(strFramePathName, (npBuffer * 255.0).astype(np.uint8))
+            imageio.imwrite(strFramePathName, (np.clip(npBuffer, 0.0, 1.0) * 255.0).astype(np.uint8))
 
             #imageWriter.close()
 

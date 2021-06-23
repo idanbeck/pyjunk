@@ -170,6 +170,7 @@ def LoadFramesetJSON(strFramesetName):
     strPath = join('repos', 'pyjunk', 'data', 'frames', strFramesetName)
 
     framesetJSONFile = open(join(strPath, strFramesetFilename))
+    #print(framesetJSONFile)
     jsonFrameset = json.load(framesetJSONFile)
     framesetJSONFile.close()
     return jsonFrameset
