@@ -243,15 +243,15 @@ class frameset():
         # Play a sound when done
         return utils.beep()
 
-    def visualize(self, strTitle=None, fInvert=False):
+    def visualize(self, strTitle=None, fInvert=False, patch_extents=None):
         for f in self.frames:
 
             print("Visualizing frame %s: %s" % (self.strFramesetName, f.frame_id()))
 
             if (strTitle != None):
-                f.visualize(strTitle=strTitle + ': ' + self.strFramesetName, fInvert=fInvert)
+                f.visualize(strTitle=strTitle + ': ' + self.strFramesetName, fInvert=fInvert, patch_extents=patch_extents)
             else:
-                f.visualize(strTitle=self.strFramesetName, fInvert=fInvert)
+                f.visualize(strTitle=self.strFramesetName, fInvert=fInvert, patch_extents=patch_extents)
 
     def shape(self):
         if(self._shape == None):

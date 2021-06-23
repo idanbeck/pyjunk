@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 from repos.pyjunk.models.Model import Model
 from repos.pyjunk.junktools.image import image
@@ -52,7 +53,7 @@ class SSFeatExtract(nn.Module):
 
 
 class SupersamplingUNet(Model):
-    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=3, num_filters=32,
+    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=4, num_filters=32,
                  ssim_window_size=11, lambda_vgg=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
                  upsample_mode='nearest', fZeroSampling=True, fLearnedMask=False, fAugmentNoise=True,
                  *args, **kwargs):
@@ -61,7 +62,7 @@ class SupersamplingUNet(Model):
         self.input_rgb_shape = input_rgb_shape
         self.input_depth_shape = input_depth_shape
         self.output_shape = output_shape
-        self.scale = scale
+        self.scale = scale      # Note sale is per-axis scaling
         self.num_filters = num_filters
         self.out_features = 8
         self.num_feat_filters = 32
@@ -206,6 +207,7 @@ class SupersamplingUNet(Model):
 
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+        in_B, in_H, in_W, in_C = in_rgbd.shape
 
         input_rgb = in_rgbd[:, :, :, 0:3]
 
@@ -230,7 +232,7 @@ class SupersamplingUNet(Model):
         out_upsampled = self.upsampling(out_feat)
 
         if (self.fZeroSampling == True):
-            out_zerosampled = out_upsampled * self.zero_upsampling_mask
+            out_zerosampled = out_upsampled * self.zero_upsampling_mask[:, :, :in_H * self.scale_factor, :in_W * self.scale_factor]
 
         # U-net
 
@@ -258,6 +260,7 @@ class SupersamplingUNet(Model):
 
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
+        in_B, in_H, in_W, in_C = in_ycbcrd.shape
 
         input_ycbcr = in_ycbcrd[:, :3, :, :]
         input_depth = in_ycbcrd[:, 3:(3 + in_depth_C), :, :]
@@ -272,7 +275,7 @@ class SupersamplingUNet(Model):
         out_upsampled = self.upsampling(out_feat)
 
         if(self.fZeroSampling == True):
-           out_zerosampled = out_upsampled * self.zero_upsampling_mask
+           out_zerosampled = out_upsampled * self.zero_upsampling_mask[:, :, :in_H * self.scale_factor, :in_W * self.scale_factor]
 
         # U-net
 
@@ -292,6 +295,7 @@ class SupersamplingUNet(Model):
 
         B, C, H, W = target_x.shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+        in_B, in_H, in_W, in_C = in_x.shape
 
         # in_x = in_x.permute(0, 3, 1, 2)
         # in_x_ycbcr = ycbcr(in_x)
@@ -336,7 +340,8 @@ class SupersamplingUNet(Model):
         if (self.fZeroSampling == True):
             # print(out.shape)
             # print(self.zero_upsampling_mask.shape)
-            out = out * self.zero_upsampling_mask
+            #out = out * self.zero_upsampling_mask
+            out = out * self.zero_upsampling_mask[:, :, :in_H * self.scale_factor, :in_W * self.scale_factor]
 
         # U-net (avoid the scaling in the other network so do this here)
 
@@ -394,7 +399,7 @@ class SupersamplingUNet(Model):
         # return an image
         return torchLoss
 
-    def loss_with_frames(self, sourceFrames, targetFrames):
+    def loss_with_frames(self, sourceFrames, targetFrames, patch_size=None):
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
 
@@ -444,7 +449,7 @@ class SupersamplingUNet(Model):
         # return an image
         return torchLoss
 
-    def forward_with_frame(self, frameObject):
+    def forward_with_frame(self, frameObject, lr_patch_size=None):
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
 
@@ -454,8 +459,17 @@ class SupersamplingUNet(Model):
         if (in_rgb_C > 3):
             in_rgb_C = 3
 
+        patch_extents = None
+        if(lr_patch_size != None):
+            patchH, patchW = lr_patch_size
+            minY, maxY = 0, in_rgb_H - patchH
+            minX, maxX = 0, in_rgb_W - patchW
+            Y = np.random.randint(minY, maxY)
+            X = np.random.randint(minX, maxX)
+            patch_extents = (Y, X, patchH, patchW)
+
         # Grab the torch tensor from the frame (this may be a particularly deep tensor)
-        npFrameBuffer = frameObject.GetNumpyBuffer()
+        npFrameBuffer = frameObject.GetNumpyBuffer(patch_extents=patch_extents)
         torchImageBuffer = torch.FloatTensor(npFrameBuffer)
         torchImageBuffer = torchImageBuffer.unsqueeze(0).to(ptu.GetDevice())
         torchImageBuffer = torchImageBuffer[:, :, :, :(in_rgb_C + in_depth_C)]

@@ -23,6 +23,11 @@ class ConvUNetTorchSolver(TorchSolver):
                                                            lambda epoch: (self.epochs - epoch) / self.epochs,
                                                            last_epoch=-1)
 
+        # Patch based training
+        self.num_patches = self.params.get('num_patches', None)
+        self.lr_patch_size = self.params.get('lr_patch_size', None)
+        self.scale_factor = self.params.get('scale_factor', None)
+
     def train_frameset(self, train_frameset, train_target_frameset):
         self.model.train()
 

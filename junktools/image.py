@@ -147,14 +147,26 @@ class image():
             if (self.fVerbose):
                 print("unloaded image state: %s channel: %s id: %s frameset: %s" % (self.load_state, self.strChannelName, self.strFrameID, self.strFramesetName))
 
-        def GetNumpyBuffer(self):
+        def GetNumpyBuffer(self, patch_extents=None):
             if(self.load_state == self.states.not_loaded):
                 self.LoadImage()
 
             if(not isinstance(self.npImageBuffer, np.ndarray)):
                 raise BufferError
 
-            return self.npImageBuffer
+            npImageBuffer = self.npImageBuffer
+
+            # Clip to the extents
+            if(patch_extents != None):
+                Y, X, H, W = patch_extents
+                startX, endX = X, X + W
+                startY, endY = Y, Y + H
+                if(len(npImageBuffer) == 4):
+                    npImageBuffer = npImageBuffer[:, startY:endY, startX:endX, :]
+                else:
+                    npImageBuffer = npImageBuffer[startY:endY, startX:endX, :]
+
+            return npImageBuffer
 
         def shape(self):
             if(self._shape == None):
@@ -185,14 +197,14 @@ class image():
         def channels(self):
             return self.npImageBuffer.shape[2]
 
-        def visualize(self, strTitle=None, fInvert=False):
+        def visualize(self, strTitle=None, fInvert=False, patch_extents=None):
             #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(0, 3, 1, 2)
             #vals = (torch.FloatTensor(self.npImageBuffer) / 255.0).permute(2, 0, 1)
 
             if (self.fVerbose):
                 print("visualizing image state: %s id: %s frameset: %s" % (self.load_state, self.strFrameID, self.strFramesetName))
 
-            npImageBuffer = self.GetNumpyBuffer()
+            npImageBuffer = self.GetNumpyBuffer(patch_extents=patch_extents)
             if(not isinstance(self.npImageBuffer, np.ndarray)):
                 raise BufferError
 

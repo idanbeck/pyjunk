@@ -145,15 +145,15 @@ class frame():
                     fVerbose = self.fVerbose
                 )
 
-    def visualize(self, strTitle=None, fInvert=False):
+    def visualize(self, strTitle=None, fInvert=False, patch_extents=None):
         for strName, channelImage in self.channels.items():
             if(self.strFrameID != None):
                 strName = strName + ": " + self.strFrameID
 
             if (strTitle != None):
-                channelImage.visualize(strTitle=strTitle + ': ' + strName, fInvert=fInvert)
+                channelImage.visualize(strTitle=strTitle + ': ' + strName, fInvert=fInvert, patch_extents=patch_extents)
             else:
-                channelImage.visualize(strTitle=strName, fInvert=fInvert)
+                channelImage.visualize(strTitle=strName, fInvert=fInvert, patch_extents=patch_extents)
 
     def clear_transforms(self):
         for strName, channelImage in self.channels.items():
@@ -211,7 +211,9 @@ class frame():
         for strName, channelImage in self.channels.items():
             channelImage.UnloadImage()
 
-    def GetNumpyBuffer(self, channels=None):
+    def GetNumpyBuffer(self, channels=None, patch_extents=None):
+
+        # Patch Extents applied only after load
 
         # Use selective channels
         if(channels != None):
@@ -229,6 +231,12 @@ class frame():
                     if (self.channels[strName].fJITLoading == True):
                         self.channels[strName].UnloadImage()
 
+            if (patch_extents != None):
+                Y, X, H, W = patch_extents
+                startX, endX = X, X + W
+                startY, endY = Y, Y + H
+                npBuffer = npBuffer[startY:endY, startX:endX, :]
+
             return npBuffer
         else:
             fFirst = True
@@ -244,5 +252,13 @@ class frame():
                     npBuffer = np.concatenate((npBuffer, channelImage.GetNumpyBuffer()), axis=2)
                     if (channelImage.fJITLoading == True):
                         channelImage.UnloadImage()
+
+            if (patch_extents != None):
+                Y, X, H, W = patch_extents
+                startX, endX = X, X + W
+                startY, endY = Y, Y + H
+                npBuffer = npBuffer[startY:endY, startX:endX, :]
+
+            return npBuffer
 
             return npBuffer
