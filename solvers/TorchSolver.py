@@ -79,7 +79,20 @@ class TorchSolver():
 
         return epoch, loss
 
-    def SaveONNXCheckpoint(self, strCheckpointFilename, sampleModelInput, opset_version=9):
+    def SaveONNXCheckpoint(self,
+                           strCheckpointFilename,
+                           sampleModelInput,
+                           opset_version=9,
+                           dynamic_axes={},
+                           input_names=['input'],
+                           output_names=['out'],
+                           example_outputs=None,
+                           params_for_forward=None
+                           ):
+
+        if(params_for_forward != None):
+            self.model.params_for_forward = params_for_forward
+
         # Export the model
         torch.onnx.export(self.model,                   # model being run
                           sampleModelInput,             # model input (or a tuple for multiple inputs)
@@ -87,8 +100,12 @@ class TorchSolver():
                           export_params=True,           # store the trained parameter weights inside the model file
                           opset_version=opset_version,              # the ONNX version to export the model to
                           do_constant_folding=True,     # whether to execute constant folding for optimization
-                          input_names=['X'],            # the model's input names
-                          output_names=['Y']            # the model's output names
+                          input_names=input_names,            # the model's input names
+                          output_names=output_names,            # the model's output names
+                          verbose=True,
+                          dynamic_axes=dynamic_axes
                           )
+
+        self.model.params_for_forward = None
 
 
