@@ -61,7 +61,12 @@ class ConvUNetTorchSolver(TorchSolver):
         #     training_losses.append(loss.item())
         #loss = self.model.loss_with_frames(frames, target_frames)
         try:
-            loss = self.model.loss_with_frames(frames, target_frames)
+            loss = self.model.loss_with_frames(
+                frames,
+                target_frames,
+                lr_patch_size=self.lr_patch_size,
+                num_patches=self.num_patches
+            )
         except Exception as e:
             print(f'epoch failed: {e}, skipping...')
             return [0]
@@ -128,7 +133,7 @@ class ConvUNetTorchSolver(TorchSolver):
             #print(torchImageBuffer.shape)
             testImgTarget = image(torchBuffer=torchImageBuffer)
 
-            testImgOutput = self.model.forward_with_frame(frames[frameid])
+            testImgOutput, _ = self.model.forward_with_frame(frames[frameid])
         if(loss == 0.0):
             return 0.0, testImgSource, testImgTarget, testImgOutput
         else:
@@ -144,6 +149,7 @@ class ConvUNetTorchSolver(TorchSolver):
         pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
 
         for epoch in pbar:
+            print(f'epoch {epoch}')
             train_losses = self.train_frameset(
                 train_frameset=train_frameset, train_target_frameset=train_target_frameset
             )
@@ -177,6 +183,8 @@ class ConvUNetTorchSolver(TorchSolver):
 
                     testImgSource.SaveToFile(strSaveFileNameSource)
                     testImgTarget.SaveToFile(strSaveFileNameTarget)
+
+                    print(testImgOutput)
                     testImgOutput.SaveToFile(strSaveFileNameOutput)
 
 

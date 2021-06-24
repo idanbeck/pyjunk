@@ -399,9 +399,15 @@ class SupersamplingUNet(Model):
         # return an image
         return torchLoss
 
-    def loss_with_frames(self, sourceFrames, targetFrames, patch_size=None):
+    def loss_with_frames(self, sourceFrames, targetFrames, lr_patch_size=None, num_patches=None):
         in_rgb_H, in_rgb_W, in_rgb_C = self.input_rgb_shape
         in_depth_H, in_depth_W, in_depth_C = self.input_depth_shape
+        out_rgb_H, out_rgb_W, out_rgb_C = self.output_shape
+        scale_factor = out_rgb_H // in_rgb_H
+
+        hr_patch_size = None
+        if(lr_patch_size != None):
+            hr_patch_size = (lr_patch_size[0] * scale_factor, lr_patch_size[1] * scale_factor)
 
         # This is for sure a hack
         if (in_depth_C > 3):
@@ -416,18 +422,63 @@ class SupersamplingUNet(Model):
         x_hr = None
 
         for frame_lr, frame_hr in pbar:
+            patch_extents = []
+
+            if(num_patches != None and lr_patch_size != None and hr_patch_size != None):
+                # print(frame_lr.strFrameID)
+                # print(frame_hr.strFrameID)
+
+                for patch in range(num_patches):
+                    # Create N LR/HR patches
+                    lrH, lrW = lr_patch_size
+
+                    minLRY, maxLRY = 0, in_rgb_H - lrH
+                    minLRX, maxLRX = 0, in_rgb_W - lrW
+
+                    lrY = np.random.randint(minLRY, maxLRY)
+                    lrX = np.random.randint(minLRX, maxLRX)
+
+                    lr_patch_extents = (lrY, lrX, lrH, lrW)
+                    hr_patch_extents = (lrY * scale_factor, lrX * scale_factor, lrH * scale_factor, lrW * scale_factor)
+
+                    patch_extents.append((lr_patch_extents, hr_patch_extents))
+
+            print(patch_extents)
+
             npFrameLRBuffer = frame_lr.GetNumpyBuffer()
             torchImageLRBuffer = torch.FloatTensor(npFrameLRBuffer)
             torchImageLRBuffer = torchImageLRBuffer.unsqueeze(0).to(ptu.GetDevice())
             torchImageLRBuffer = torchImageLRBuffer[:, :, :, :(in_rgb_C + in_depth_C)]
             # torchImageLRBuffer = torchImageLRBuffer.permute(0, 3, 1, 2)
 
-            x_lr_ = torchImageLRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+            x_lr_ = None
+            if(len(patch_extents) > 0):
+                for lr_patch_extent, _ in patch_extents:
+                    Y, X, H, W = lr_patch_extent
+                    startX, endX = X, X + W
+                    startY, endY = Y, Y + H
+                    lr_patch = torchImageLRBuffer[:, startY:endY, startX:endX, :]
+                    lr_patch = lr_patch.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+                    # print("lr_patch")
+                    # print(lr_patch.shape)
+
+                    if(x_lr_ == None):
+                        x_lr_ = lr_patch
+                    else:
+                        x_lr_ = torch.cat((x_lr_, lr_patch), dim=0)
+
+                    # print("x_lr_")
+                    # print(x_lr_.shape)
+            else:
+                x_lr_ = torchImageLRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
 
             if (x_lr == None):
                 x_lr = x_lr_
             else:
                 x_lr = torch.cat((x_lr, x_lr_), dim=0)
+
+            # print("x_lr")
+            # print(x_lr.shape)
 
             npFrameHRBuffer = frame_hr.GetNumpyBuffer()
             torchImageHRBuffer = torch.FloatTensor(npFrameHRBuffer)
@@ -435,11 +486,28 @@ class SupersamplingUNet(Model):
             torchImageHRBuffer = torchImageHRBuffer[:, :, :, :3]  # bit of a hack tho
             # torchImageHRBuffer = torchImageHRBuffer.permute(0, 3, 1, 2)
 
-            x_hr_ = torchImageHRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+            x_hr_ = None
+            if (len(patch_extents) > 0):
+                for _, hr_patch_extent in patch_extents:
+                    Y, X, H, W = hr_patch_extent
+                    startX, endX = X, X + W
+                    startY, endY = Y, Y + H
+                    hr_patch = torchImageHRBuffer[:, startY:endY, startX:endX, :]
+                    hr_patch = hr_patch.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+                    if (x_hr_ == None):
+                        x_hr_ = hr_patch
+                    else:
+                        x_hr_ = torch.cat((x_hr_, hr_patch), dim=0)
+            else:
+                x_hr_ = torchImageHRBuffer.to(ptu.GetDevice()).float().contiguous() * 2.0 - 1.0
+
             if (x_hr == None):
                 x_hr = x_hr_
             else:
                 x_hr = torch.cat((x_hr, x_hr_), dim=0)
+
+            # print("x_hr")
+            # print(x_hr.shape)
 
         # Run the model
         torchLoss = self.loss(
