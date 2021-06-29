@@ -443,7 +443,7 @@ class SupersamplingUNet(Model):
 
                     patch_extents.append((lr_patch_extents, hr_patch_extents))
 
-            print(patch_extents)
+            #print(patch_extents)
 
             npFrameLRBuffer = frame_lr.GetNumpyBuffer()
             torchImageLRBuffer = torch.FloatTensor(npFrameLRBuffer)
