@@ -149,7 +149,7 @@ class ConvUNetTorchSolver(TorchSolver):
         pbar = tqdm_notebook(range(self.epochs), desc='Epoch', leave=False)
 
         for epoch in pbar:
-            print(f'epoch {epoch}')
+            #print(f'epoch {epoch}')
             train_losses = self.train_frameset(
                 train_frameset=train_frameset, train_target_frameset=train_target_frameset
             )
