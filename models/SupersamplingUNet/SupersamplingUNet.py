@@ -53,9 +53,11 @@ class SSFeatExtract(nn.Module):
 
 
 class SupersamplingUNet(Model):
-    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=4, num_filters=32,
-                 ssim_window_size=11, lambda_vgg=0.1, lambda_ssim=1.0, lamda_L1=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
-                 upsample_mode='nearest', fZeroSampling=True, fLearnedMask=False, fAugmentNoise=True,
+    def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=3,
+                 num_filters=32, num_feat_filters=32, out_features=8, ssim_window_size=11,
+                 lambda_vgg=0.1, lambda_ssim=1.0, lamda_L1=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
+                 upsample_mode='nearest',
+                 fZeroSampling=True, fLearnedMask=False, fAugmentNoise=True,
                  *args, **kwargs):
 
         # input shape is h, w, c
@@ -64,8 +66,8 @@ class SupersamplingUNet(Model):
         self.output_shape = output_shape
         self.scale = scale      # Note sale is per-axis scaling
         self.num_filters = num_filters
-        self.out_features = 8
-        self.num_feat_filters = 32
+        self.out_features = out_features
+        self.num_feat_filters = num_feat_filters
         self.fAugmentNoise = fAugmentNoise
         self.lambda_augment = lambda_augment
         self.ssim_window_size = ssim_window_size
@@ -128,8 +130,8 @@ class SupersamplingUNet(Model):
         self.unet = ConvUNet(
             input_shape=(out_H, out_W, in_rgb_C + in_depth_C + self.out_features),
             output_shape=(out_H, out_W, out_C),
-            scale=3,
-            num_filters=32
+            scale=self.scale,
+            num_filters=self.num_filters
         ).to(ptu.GetDevice())
 
         self.vgg_loss = VGGLoss(
