@@ -163,7 +163,9 @@ class frameset():
         # Load frame set from disk, first find the respective json file
         framesetJSON = utils.LoadFramesetJSON(strFramesetName)
 
-        self.start_frame = int(framesetJSON['start_frame'])
+        if(self.start_frame == None):
+            self.start_frame = int(framesetJSON['start_frame'])
+
         if((self.num_frames is None) or (self.start_frame + self.num_frames) >= framesetJSON['end_frame']):
             self.end_frame = framesetJSON['end_frame']
             self.num_frames = self.end_frame - self.start_frame
