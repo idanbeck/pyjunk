@@ -54,7 +54,7 @@ class SSFeatExtract(nn.Module):
 
 class SupersamplingUNet(Model):
     def __init__(self, input_rgb_shape, input_depth_shape, output_shape, scale=4, num_filters=32,
-                 ssim_window_size=11, lambda_vgg=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
+                 ssim_window_size=11, lambda_vgg=0.1, lambda_ssim=1.0, lamda_L1=0.1, prob_aug_noise=0.8, lambda_augment=0.001,
                  upsample_mode='nearest', fZeroSampling=True, fLearnedMask=False, fAugmentNoise=True,
                  *args, **kwargs):
 
@@ -70,6 +70,8 @@ class SupersamplingUNet(Model):
         self.lambda_augment = lambda_augment
         self.ssim_window_size = ssim_window_size
         self.lambda_vgg = lambda_vgg
+        self.lambda_ssim = lambda_ssim
+        self.lambda_L1 = lamda_L1
         self.prob_aug_noise = prob_aug_noise
         self.upsample_mode = upsample_mode
         self.fZeroSampling = fZeroSampling
@@ -364,7 +366,9 @@ class SupersamplingUNet(Model):
         vgg_loss = self.vgg_loss.loss(out_rgb, target_x_rgb)
         # print(vgg_loss)
 
-        loss = ssim_loss + self.lambda_vgg * vgg_loss
+        L1_loss = torch.nn.L1Loss()(out_rgb, target_x_rgb)
+
+        loss = self.lambda_ssim * ssim_loss + self.lambda_vgg * vgg_loss + self.lambda_L1 * L1_loss
         # loss = ssim_loss
 
         return loss
