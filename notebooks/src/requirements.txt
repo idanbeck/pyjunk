@@ -1,0 +1,13 @@
+matplotlib
+numpy
+scipy
+jupyter
+torchvision
+imageio
+psutil
+scikit-image
+albumentations
+moviepy
+kornia
+tqdm
+onnx
